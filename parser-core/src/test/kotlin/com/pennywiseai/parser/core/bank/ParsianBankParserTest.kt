@@ -60,6 +60,41 @@ class ParsianBankParserTest {
                     type = TransactionType.EXPENSE,
                     balance = BigDecimal("1550000")
                 )
+            ),
+            // Real-world Parsian SMS format: no currency word, direction shown as a
+            // trailing +/- on the amount, account number on its own leading line.
+            ParserTestCase(
+                name = "Parsian Bank compact-format credit",
+                message = "12345671234567\nمبلغ:16,000,000+\nمانده:16,100,000\n04/16\n19:36",
+                sender = "PARSIANBANK",
+                expected = ExpectedTransaction(
+                    amount = BigDecimal("16000000"),
+                    currency = "IRR",
+                    type = TransactionType.INCOME,
+                    balance = BigDecimal("16100000"),
+                    accountLast4 = "4567"
+                )
+            ),
+            ParserTestCase(
+                name = "Parsian Bank compact-format debit",
+                message = "12345671234567\nمبلغ:1,035,000-\nمانده:2,219,974\n04/18\n15:46",
+                sender = "PARSIANBANK",
+                expected = ExpectedTransaction(
+                    amount = BigDecimal("1035000"),
+                    currency = "IRR",
+                    type = TransactionType.EXPENSE,
+                    balance = BigDecimal("2219974"),
+                    accountLast4 = "4567"
+                )
+            ),
+            // Transfer-authorization SMS: carries an amount and "انتقال" but is NOT a
+            // completed transaction — it's a one-time code (رمز) to authorize a pending
+            // transfer. Must never be parsed as a real transaction.
+            ParserTestCase(
+                name = "Parsian Bank transfer authorization code (not a transaction)",
+                message = "انتقال به\n603799*4741\nمبلغ  10,000,000\nرمز:  93022172",
+                sender = "PARSIANBANK",
+                shouldParse = false
             )
         )
 

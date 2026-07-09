@@ -186,14 +186,7 @@ fun HomeScreen(
 
         activity?.let {
             val componentActivity = it as ComponentActivity
-            
-            // Check for app updates
-            viewModel.checkForAppUpdate(
-                activity = componentActivity,
-                snackbarHostState = snackbarHostState,
-                scope = scope
-            )
-            
+
             // Check for in-app review eligibility
             viewModel.checkForInAppReview(componentActivity)
         }

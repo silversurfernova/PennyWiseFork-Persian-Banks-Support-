@@ -11,16 +11,30 @@ abstract class BaseIranianBankParser : BankParser() {
 
     override fun getCurrency(): String = "IRR"
 
+    /**
+     * Iranian bank SMS mix Arabic-script and Persian-script Unicode variants of the
+     * same letters (e.g. Arabic Yeh ي U+064A vs Persian Yeh ی U+06CC, Arabic Kaf ك
+     * U+0643 vs Persian Keheh ک U+06A9) depending on how the operator encoded the
+     * message. They render identically but don't match in string comparisons, so
+     * every keyword check below normalizes to the Persian forms first.
+     */
+    protected fun normalizePersian(text: String): String =
+        text.replace('ي', 'ی').replace('ك', 'ک')
+
     override fun extractAmount(message: String): BigDecimal? {
-        // Pattern 1: "مبلغ 1,500,000 ریال" or "مبلغ 1,500,000 تومان"
+        val normalizedMessage = normalizePersian(message)
         val patterns = listOf(
+            // Compact format (e.g. Parsian): "مبلغ:161,000,000+" / "مبلغ:160,000,000-"
+            // No currency word at all; sign right after the digits marks credit/debit.
+            Regex("""مبلغ\s*:?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*[+-]"""),
+            // Pattern 1: "مبلغ 1,500,000 ریال" or "مبلغ 1,500,000 تومان"
             Regex("""مبلغ\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:ریال|تومان)"""),
             // Pattern 2: amount followed directly by keyword
             Regex("""(\d{1,3}(?:,\d{3})*|\d+)\s*(?:ریال|تومان)""")
         )
 
         for (pattern in patterns) {
-            pattern.find(message)?.let { match ->
+            pattern.find(normalizedMessage)?.let { match ->
                 val cleanAmount = match.groupValues[1].replace(",", "")
                 return try {
                     val amountValue = cleanAmount.toBigDecimal()
@@ -39,10 +53,16 @@ abstract class BaseIranianBankParser : BankParser() {
     }
 
     override fun extractTransactionType(message: String): TransactionType? {
-        val lowerMessage = message.lowercase()
+        val lowerMessage = normalizePersian(message).lowercase()
 
         if (isInvestmentTransaction(lowerMessage)) {
             return TransactionType.INVESTMENT
+        }
+
+        // Compact format (e.g. Parsian): direction is a trailing sign on the amount,
+        // "مبلغ:161,000,000+" (credit) or "مبلغ:160,000,000-" (debit) — no verb present.
+        Regex("""مبلغ\s*:?\s*[\d,]+\s*([+-])""").find(lowerMessage)?.let { match ->
+            return if (match.groupValues[1] == "+") TransactionType.INCOME else TransactionType.EXPENSE
         }
 
         return when {
@@ -74,6 +94,19 @@ abstract class BaseIranianBankParser : BankParser() {
 
     override fun extractAccountLast4(message: String): String? {
         super.extractAccountLast4(message)?.let { return it }
+
+        // Masked card format (e.g. Tejarat): "کارت: 7034****585983" — take the
+        // digits trailing the mask, then the last 4 of those.
+        Regex("""\*{2,}(\d{3,})""").find(message)?.let { match ->
+            extractLast4Digits(match.groupValues[1])?.let { return it }
+        }
+
+        // Compact format (e.g. Parsian): message opens with a standalone long account
+        // number on its own line, e.g. "47001571471606\nمبلغ:161,000,000+\n..."
+        Regex("""^\s*(\d{10,})\s*$""", RegexOption.MULTILINE).find(message)?.let { match ->
+            extractLast4Digits(match.groupValues[1])?.let { return it }
+        }
+
         val cardPattern = Regex("""\d{4}[-\s]?(\d{4})""")
         cardPattern.find(message)?.let { match ->
             return match.groupValues[1]
@@ -97,7 +130,7 @@ abstract class BaseIranianBankParser : BankParser() {
     }
 
     override fun detectIsCard(message: String): Boolean {
-        val lowerMessage = message.lowercase()
+        val lowerMessage = normalizePersian(message).lowercase()
 
         val cardKeywords = listOf(
             "کارت", "card", "debit card", "credit card", "کارت بدهی", "کارت اعتباری"
@@ -107,10 +140,10 @@ abstract class BaseIranianBankParser : BankParser() {
     }
 
     override fun isTransactionMessage(message: String): Boolean {
-        val lowerMessage = message.lowercase()
+        val lowerMessage = normalizePersian(message).lowercase()
 
         if (lowerMessage.contains("otp") ||
-            lowerMessage.contains("رمز یکبار مصرف") ||
+            lowerMessage.contains("رمز") ||
             lowerMessage.contains("کد تایید")
         ) {
             return false

@@ -391,10 +391,26 @@ class ManageAccountsViewModel @Inject constructor(
                 // Get card info first to know if there's a balance to copy
                 val card = cardRepository.getCardById(cardId)
                 val hasBalance = card?.lastBalance != null
-                
-                // Link the card to the account
-                cardRepository.linkCardToAccount(cardId, accountLast4)
-                
+
+                // Link the card to the account, and re-target any transactions
+                // already recorded under the card's own last-4 (from before it
+                // was linked) so the account's history isn't left empty.
+                database.withTransaction {
+                    cardRepository.linkCardToAccount(cardId, accountLast4)
+                    if (card != null) {
+                        transactionRepository.mergeAccountTransactions(
+                            sourceBankName = card.bankName,
+                            sourceAccountLast4 = card.cardLast4,
+                            targetBankName = card.bankName,
+                            targetAccountLast4 = accountLast4
+                        )
+                        transactionRepository.retargetTransferLegRefs(
+                            sourceAccountLast4 = card.cardLast4,
+                            targetAccountLast4 = accountLast4
+                        )
+                    }
+                }
+
                 // If card had a balance, copy it to the account
                 if (card != null && hasBalance) {
                     try {
