@@ -19,6 +19,8 @@ import com.pennywiseai.tracker.presentation.common.buildProfileAccountKeys
 import com.pennywiseai.tracker.presentation.common.filterTransactionsByProfile
 import com.pennywiseai.tracker.presentation.common.getDateRangeForPeriod
 import com.pennywiseai.tracker.utils.CurrencyUtils
+import com.pennywiseai.tracker.utils.DateFormatter
+import com.pennywiseai.tracker.utils.JalaliYearMonth
 import com.pennywiseai.tracker.domain.model.BudgetCycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -537,7 +539,9 @@ class AnalyticsViewModel @Inject constructor(
      */
     private suspend fun getThisCycleRange(): Pair<LocalDate, LocalDate> {
         val startDay = userPreferencesRepository.getBudgetCycleStartDay()
-        val (start, end) = BudgetCycle.currentCycle(LocalDate.now(), startDay)
+        val (start, end) = BudgetCycle.currentCycle(
+            LocalDate.now(), startDay, useJalali = DateFormatter.useJalaliCalendar
+        )
         return start to end
     }
 
@@ -592,32 +596,73 @@ class AnalyticsViewModel @Inject constructor(
                     startDate
                 }
 
-                val yearsInRange = ChronoUnit.YEARS.between(actualStartDate, endDate)
-                val aggregateByYear = selectedPeriod == TimePeriod.ALL && yearsInRange >= 2
+                // CURRENT_FY is a fixed April-March fiscal concept (unrelated to calendar
+                // system), so it always buckets in Gregorian months. ALL respects the
+                // Jalali display toggle for its bucketing.
+                val useJalali = selectedPeriod == TimePeriod.ALL && DateFormatter.useJalaliCalendar
 
-                if (aggregateByYear) {
-                    var currentYear = actualStartDate.withDayOfYear(1)
-                    val lastYear = endDate.withDayOfYear(1)
-                    while (!currentYear.isAfter(lastYear) && !currentYear.isAfter(LocalDate.now().withDayOfYear(1))) {
-                        val endOfYear = currentYear.withDayOfYear(currentYear.lengthOfYear())
-                        val totalAmount = transactions.filter {
-                            !it.dateTime.toLocalDate().isBefore(currentYear) && !it.dateTime.toLocalDate().isAfter(endOfYear)
-                        }.map(amountIn).sum().toBigDecimal()
-                            .minus(refundsInRange(currentYear, endOfYear)).coerceAtLeast(BigDecimal.ZERO)
-                        trend.add(BalancePoint(timestamp = currentYear.atStartOfDay(), balance = totalAmount, currency = currency))
-                        currentYear = currentYear.plusYears(1)
+                if (useJalali) {
+                    val startYm = JalaliYearMonth.from(actualStartDate)
+                    val lastYm = JalaliYearMonth.from(endDate)
+                    val todayYm = JalaliYearMonth.from(LocalDate.now())
+                    val yearsInRange = lastYm.year - startYm.year
+                    val aggregateByYear = yearsInRange >= 2
+
+                    if (aggregateByYear) {
+                        var currentYear = startYm.year
+                        val lastYear = minOf(lastYm.year, todayYm.year)
+                        while (currentYear <= lastYear) {
+                            val yearStart = JalaliYearMonth(currentYear, 1).atDay(1)
+                            val yearEnd = JalaliYearMonth(currentYear, 12).atEndOfMonth()
+                            val totalAmount = transactions.filter {
+                                !it.dateTime.toLocalDate().isBefore(yearStart) && !it.dateTime.toLocalDate().isAfter(yearEnd)
+                            }.map(amountIn).sum().toBigDecimal()
+                                .minus(refundsInRange(yearStart, yearEnd)).coerceAtLeast(BigDecimal.ZERO)
+                            trend.add(BalancePoint(timestamp = yearStart.atStartOfDay(), balance = totalAmount, currency = currency))
+                            currentYear += 1
+                        }
+                    } else {
+                        var currentMonth = startYm
+                        val lastMonth = if (lastYm <= todayYm) lastYm else todayYm
+                        while (currentMonth <= lastMonth) {
+                            val monthStart = currentMonth.atDay(1)
+                            val monthEnd = currentMonth.atEndOfMonth()
+                            val totalAmount = transactions.filter {
+                                !it.dateTime.toLocalDate().isBefore(monthStart) && !it.dateTime.toLocalDate().isAfter(monthEnd)
+                            }.map(amountIn).sum().toBigDecimal()
+                                .minus(refundsInRange(monthStart, monthEnd)).coerceAtLeast(BigDecimal.ZERO)
+                            trend.add(BalancePoint(timestamp = monthStart.atStartOfDay(), balance = totalAmount, currency = currency))
+                            currentMonth = currentMonth.plusMonths(1)
+                        }
                     }
                 } else {
-                    var currentMonth = actualStartDate.withDayOfMonth(1)
-                    val lastMonth = endDate.withDayOfMonth(1)
-                    while (!currentMonth.isAfter(lastMonth) && !currentMonth.isAfter(LocalDate.now().withDayOfMonth(1))) {
-                        val endOfMonth = currentMonth.withDayOfMonth(currentMonth.lengthOfMonth())
-                        val totalAmount = transactions.filter {
-                            !it.dateTime.toLocalDate().isBefore(currentMonth) && !it.dateTime.toLocalDate().isAfter(endOfMonth)
-                        }.map(amountIn).sum().toBigDecimal()
-                            .minus(refundsInRange(currentMonth, endOfMonth)).coerceAtLeast(BigDecimal.ZERO)
-                        trend.add(BalancePoint(timestamp = currentMonth.atStartOfDay(), balance = totalAmount, currency = currency))
-                        currentMonth = currentMonth.plusMonths(1)
+                    val yearsInRange = ChronoUnit.YEARS.between(actualStartDate, endDate)
+                    val aggregateByYear = selectedPeriod == TimePeriod.ALL && yearsInRange >= 2
+
+                    if (aggregateByYear) {
+                        var currentYear = actualStartDate.withDayOfYear(1)
+                        val lastYear = endDate.withDayOfYear(1)
+                        while (!currentYear.isAfter(lastYear) && !currentYear.isAfter(LocalDate.now().withDayOfYear(1))) {
+                            val endOfYear = currentYear.withDayOfYear(currentYear.lengthOfYear())
+                            val totalAmount = transactions.filter {
+                                !it.dateTime.toLocalDate().isBefore(currentYear) && !it.dateTime.toLocalDate().isAfter(endOfYear)
+                            }.map(amountIn).sum().toBigDecimal()
+                                .minus(refundsInRange(currentYear, endOfYear)).coerceAtLeast(BigDecimal.ZERO)
+                            trend.add(BalancePoint(timestamp = currentYear.atStartOfDay(), balance = totalAmount, currency = currency))
+                            currentYear = currentYear.plusYears(1)
+                        }
+                    } else {
+                        var currentMonth = actualStartDate.withDayOfMonth(1)
+                        val lastMonth = endDate.withDayOfMonth(1)
+                        while (!currentMonth.isAfter(lastMonth) && !currentMonth.isAfter(LocalDate.now().withDayOfMonth(1))) {
+                            val endOfMonth = currentMonth.withDayOfMonth(currentMonth.lengthOfMonth())
+                            val totalAmount = transactions.filter {
+                                !it.dateTime.toLocalDate().isBefore(currentMonth) && !it.dateTime.toLocalDate().isAfter(endOfMonth)
+                            }.map(amountIn).sum().toBigDecimal()
+                                .minus(refundsInRange(currentMonth, endOfMonth)).coerceAtLeast(BigDecimal.ZERO)
+                            trend.add(BalancePoint(timestamp = currentMonth.atStartOfDay(), balance = totalAmount, currency = currency))
+                            currentMonth = currentMonth.plusMonths(1)
+                        }
                     }
                 }
             }

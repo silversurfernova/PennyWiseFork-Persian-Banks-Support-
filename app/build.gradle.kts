@@ -102,8 +102,12 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Personal test installs can skip R8 with -PfastRelease=true for a much
+            // faster build; real releases (scripts/release.sh) never pass this flag,
+            // so the shipped APK is always minified.
+            val fastRelease = project.hasProperty("fastRelease")
+            isMinifyEnabled = !fastRelease
+            isShrinkResources = !fastRelease
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

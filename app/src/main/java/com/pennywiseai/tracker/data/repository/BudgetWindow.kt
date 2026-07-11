@@ -3,6 +3,7 @@ package com.pennywiseai.tracker.data.repository
 import com.pennywiseai.tracker.data.database.entity.BudgetEntity
 import com.pennywiseai.tracker.data.database.entity.BudgetPeriodType
 import com.pennywiseai.tracker.domain.model.BudgetCycle
+import com.pennywiseai.tracker.utils.DateFormatter
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -45,7 +46,8 @@ data class BudgetWindow(
 fun resolveBudgetWindow(
     budget: BudgetEntity,
     reference: LocalDate,
-    globalStartDay: Int = BudgetCycle.DEFAULT_START_DAY
+    globalStartDay: Int = BudgetCycle.DEFAULT_START_DAY,
+    useJalali: Boolean = DateFormatter.useJalaliCalendar
 ): BudgetWindow = when (budget.periodType) {
     BudgetPeriodType.WEEKLY -> {
         val dow = budget.weekStartDay?.let { DayOfWeek.of(it.coerceIn(1, 7)) }
@@ -57,7 +59,7 @@ fun resolveBudgetWindow(
     BudgetPeriodType.MONTHLY -> {
         val day = budget.monthStartDay?.let { BudgetCycle.clampStartDay(it) }
             ?: BudgetCycle.clampStartDay(globalStartDay)
-        val (start, end) = BudgetCycle.currentCycle(reference, day)
+        val (start, end) = BudgetCycle.currentCycle(reference, day, useJalali)
         BudgetWindow(start, end, ChronoUnit.DAYS.between(start, end).toInt() + 1)
     }
     BudgetPeriodType.CUSTOM -> {

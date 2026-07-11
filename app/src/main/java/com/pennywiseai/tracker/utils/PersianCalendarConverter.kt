@@ -8,8 +8,12 @@ package com.pennywiseai.tracker.utils
  * accurate for every Jalali year covered by [BREAKS] — roughly 1 AP to
  * beyond year 3000 AP, far more than the app will ever need to display.
  *
- * Display-only: nothing that stores or filters dates goes through this —
- * transactions, backups, and DB columns all stay Gregorian.
+ * Used for both display (via [PersianDateFormatter]) and for computing
+ * "this month" / "this week" boundaries when Jalali mode is on (see
+ * [JalaliYearMonth] and the `useJalali` params on [com.pennywiseai.tracker.domain.model.BudgetCycle]).
+ * Transactions themselves, backups, and DB columns are untouched and always
+ * store/query Gregorian instants — only which Gregorian instants count as
+ * "this month" changes.
  */
 object PersianCalendarConverter {
 
@@ -102,4 +106,14 @@ object PersianCalendarConverter {
 
     /** Converts a Jalali date to Gregorian. Returns (year, month[1-12], day). */
     fun toGregorian(jy: Int, jm: Int, jd: Int): Triple<Int, Int, Int> = d2g(j2d(jy, jm, jd))
+
+    /** True if Jalali year [jy] is a leap year (Esfand has 30 days instead of 29). */
+    fun isLeapJalaliYear(jy: Int): Boolean = jalCal(jy).leap == 0
+
+    /** Number of days in Jalali month [jm] (1-12) of year [jy]. */
+    fun jalaliMonthLength(jy: Int, jm: Int): Int = when {
+        jm <= 6 -> 31
+        jm <= 11 -> 30
+        else -> if (isLeapJalaliYear(jy)) 30 else 29
+    }
 }

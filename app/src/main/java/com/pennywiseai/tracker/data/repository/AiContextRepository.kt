@@ -5,6 +5,9 @@ import com.pennywiseai.tracker.data.database.dao.TransactionDao
 import com.pennywiseai.tracker.data.database.entity.SubscriptionState
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.model.*
+import com.pennywiseai.tracker.utils.DateFormatter
+import com.pennywiseai.tracker.utils.JalaliYearMonth
+import com.pennywiseai.tracker.utils.PersianCalendarConverter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.math.BigDecimal
@@ -23,7 +26,36 @@ class AiContextRepository @Inject constructor(
     private val transactionDao: TransactionDao,
     private val subscriptionDao: SubscriptionDao
 ) {
-    
+
+    /**
+     * Start/end of the calendar month containing [date], honouring the Jalali
+     * display toggle — mirrors the "This Month" resolution used elsewhere in
+     * the app (Home/Analytics/Transactions) so the AI chat's numbers agree
+     * with what the user sees on those screens.
+     */
+    private fun monthBounds(date: LocalDate): Pair<LocalDate, LocalDate> =
+        if (DateFormatter.useJalaliCalendar) {
+            val jym = JalaliYearMonth.from(date)
+            jym.atDay(1) to jym.atEndOfMonth()
+        } else {
+            val ym = YearMonth.from(date)
+            ym.atDay(1) to ym.atEndOfMonth()
+        }
+
+    /** Day-of-month (1-based) for [date] in whichever calendar is currently displayed. */
+    private fun dayOfDisplayMonth(date: LocalDate): Int =
+        if (DateFormatter.useJalaliCalendar) {
+            PersianCalendarConverter.toJalali(date.year, date.monthValue, date.dayOfMonth).third
+        } else {
+            date.dayOfMonth
+        }
+
+    /** Length of the calendar month containing [date], honouring the Jalali toggle. */
+    private fun lengthOfDisplayMonth(date: LocalDate): Int =
+        if (DateFormatter.useJalaliCalendar) JalaliYearMonth.from(date).lengthOfMonth()
+        else YearMonth.from(date).lengthOfMonth()
+
+
     /**
      * Gathers all financial context for AI chat in parallel
      */
@@ -48,10 +80,8 @@ class AiContextRepository @Inject constructor(
     }
     
     private suspend fun getMonthSummary(currentDate: LocalDate): MonthSummary {
-        val yearMonth = YearMonth.from(currentDate)
-        val startOfMonth = yearMonth.atDay(1)
-        val endOfMonth = yearMonth.atEndOfMonth()
-        
+        val (startOfMonth, endOfMonth) = monthBounds(currentDate)
+
         // Get all transactions for current month
         val transactions = transactionDao.getTransactionsBetweenDatesList(
             startOfMonth.atStartOfDay(),
@@ -77,8 +107,8 @@ class AiContextRepository @Inject constructor(
             totalIncome = totalIncome,
             totalExpense = totalExpense,
             transactionCount = transactionCount,
-            daysInMonth = yearMonth.lengthOfMonth(),
-            currentDay = currentDate.dayOfMonth
+            daysInMonth = lengthOfDisplayMonth(currentDate),
+            currentDay = dayOfDisplayMonth(currentDate)
         )
     }
     
@@ -129,10 +159,8 @@ class AiContextRepository @Inject constructor(
     }
     
     private suspend fun getTopCategories(currentDate: LocalDate): List<CategorySpending> {
-        val yearMonth = YearMonth.from(currentDate)
-        val startOfMonth = yearMonth.atDay(1)
-        val endOfMonth = yearMonth.atEndOfMonth()
-        
+        val (startOfMonth, endOfMonth) = monthBounds(currentDate)
+
         val transactions = transactionDao.getTransactionsBetweenDatesList(
             startOfMonth.atStartOfDay(),
             endOfMonth.atTime(23, 59, 59)
@@ -170,10 +198,8 @@ class AiContextRepository @Inject constructor(
     }
     
     private suspend fun getQuickStats(currentDate: LocalDate): QuickStats {
-        val yearMonth = YearMonth.from(currentDate)
-        val startOfMonth = yearMonth.atDay(1)
-        val endOfMonth = yearMonth.atEndOfMonth()
-        
+        val (startOfMonth, endOfMonth) = monthBounds(currentDate)
+
         val transactions = transactionDao.getTransactionsBetweenDatesList(
             startOfMonth.atStartOfDay(),
             endOfMonth.atTime(23, 59, 59)
@@ -183,7 +209,7 @@ class AiContextRepository @Inject constructor(
         
         // Calculate average daily spending
         val totalExpense = expenses.map { it.amount.toDouble() }.sum().toBigDecimal()
-        val daysElapsed = currentDate.dayOfMonth
+        val daysElapsed = dayOfDisplayMonth(currentDate)
         val avgDailySpending = if (daysElapsed > 0) {
             totalExpense.divide(BigDecimal(daysElapsed), 2, RoundingMode.HALF_UP)
         } else BigDecimal.ZERO

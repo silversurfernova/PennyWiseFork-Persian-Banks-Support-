@@ -76,7 +76,9 @@ class RecentTransactionsWidgetUpdateWorker @AssistedInject constructor(
 
             val now = LocalDate.now()
             val startDay = userPreferencesRepository.getBudgetCycleStartDay()
-            val (cycleStart, _) = BudgetCycle.currentCycle(now, startDay)
+            val (cycleStart, _) = BudgetCycle.currentCycle(
+                now, startDay, useJalali = userPreferencesRepository.useJalaliCalendar.first()
+            )
             val start = cycleStart.atStartOfDay()
             val end = LocalDateTime.now()
 

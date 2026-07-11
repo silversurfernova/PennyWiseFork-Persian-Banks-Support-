@@ -28,6 +28,7 @@ import com.pennywiseai.tracker.data.repository.ProfileRepository
 import com.pennywiseai.tracker.data.repository.TransactionGroupRepository
 import com.pennywiseai.tracker.data.database.entity.TransactionGroupEntity
 import com.pennywiseai.tracker.utils.CurrencyUtils
+import com.pennywiseai.tracker.utils.DateFormatter
 import com.pennywiseai.tracker.utils.SmsReportUrlBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -867,7 +868,9 @@ class TransactionsViewModel @Inject constructor(
      */
     private suspend fun getThisCycleRange(): Pair<LocalDate, LocalDate> {
         val startDay = userPreferencesRepository.getBudgetCycleStartDay()
-        val (start, end) = BudgetCycle.currentCycle(LocalDate.now(), startDay)
+        val (start, end) = BudgetCycle.currentCycle(
+            LocalDate.now(), startDay, useJalali = DateFormatter.useJalaliCalendar
+        )
         return start to end
     }
 

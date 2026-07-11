@@ -1,5 +1,6 @@
 package com.pennywiseai.tracker.domain.model
 
+import com.pennywiseai.tracker.utils.JalaliYearMonth
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -37,19 +38,29 @@ object BudgetCycle {
      * If today.dayOfMonth >= startDay the cycle started earlier this month; otherwise
      * it started in the previous month.
      *
+     * @param useJalali when true, "month" means the Jalali (Persian) calendar month
+     * instead of the Gregorian one — [startDay] is then a day-of-Jalali-month. The
+     * returned dates are always Gregorian (that's what transactions are stored/queried
+     * by); only which Gregorian dates count as the cycle boundary changes.
      * @return pair of (cycle start inclusive, cycle end inclusive).
      */
-    fun currentCycle(today: LocalDate, startDay: Int): Pair<LocalDate, LocalDate> {
+    fun currentCycle(today: LocalDate, startDay: Int, useJalali: Boolean = false): Pair<LocalDate, LocalDate> {
         val safeStart = clampStartDay(startDay)
-        val startOfThisMonth = YearMonth.from(today).atDay(1)
-        val candidateStart = startOfThisMonth.withDayOfMonthSafe(safeStart)
-        val start = if (!today.isBefore(candidateStart)) {
-            candidateStart
+        val start = if (useJalali) {
+            val thisMonth = JalaliYearMonth.from(today)
+            val candidateStart = thisMonth.atDaySafe(safeStart)
+            if (!today.isBefore(candidateStart)) candidateStart else thisMonth.minusMonths(1).atDaySafe(safeStart)
         } else {
-            val prevMonth = YearMonth.from(today).minusMonths(1)
-            prevMonth.atDay(1).withDayOfMonthSafe(safeStart)
+            val startOfThisMonth = YearMonth.from(today).atDay(1)
+            val candidateStart = startOfThisMonth.withDayOfMonthSafe(safeStart)
+            if (!today.isBefore(candidateStart)) {
+                candidateStart
+            } else {
+                val prevMonth = YearMonth.from(today).minusMonths(1)
+                prevMonth.atDay(1).withDayOfMonthSafe(safeStart)
+            }
         }
-        val end = nextCycleStart(start, safeStart).minusDays(1)
+        val end = nextCycleStart(start, safeStart, useJalali).minusDays(1)
         return start to end
     }
 
@@ -59,12 +70,16 @@ object BudgetCycle {
      * `startDay = 31` doesn't overflow into March — this preserves the same
      * start-day cadence even across short months.
      */
-    fun previousCycle(cycle: Pair<LocalDate, LocalDate>, startDay: Int): Pair<LocalDate, LocalDate> {
+    fun previousCycle(cycle: Pair<LocalDate, LocalDate>, startDay: Int, useJalali: Boolean = false): Pair<LocalDate, LocalDate> {
         val safeStart = clampStartDay(startDay)
         // Step one calendar month back from the current cycle's start, then
         // clamp to the month's length. The previous cycle is then "one month
         // earlier to one day before the current cycle's start".
-        val prevStart = cycle.first.minusMonths(1).withDayOfMonthSafe(safeStart)
+        val prevStart = if (useJalali) {
+            JalaliYearMonth.from(cycle.first).minusMonths(1).atDaySafe(safeStart)
+        } else {
+            cycle.first.minusMonths(1).withDayOfMonthSafe(safeStart)
+        }
         val end = cycle.first.minusDays(1)
         return prevStart to end
     }
@@ -73,10 +88,10 @@ object BudgetCycle {
      * The cycle immediately after [cycle]. The next start is always one [nextCycleStart]
      * step past [cycle.first], so cycles never overlap and never have gaps.
      */
-    fun nextCycle(cycle: Pair<LocalDate, LocalDate>, startDay: Int): Pair<LocalDate, LocalDate> {
+    fun nextCycle(cycle: Pair<LocalDate, LocalDate>, startDay: Int, useJalali: Boolean = false): Pair<LocalDate, LocalDate> {
         val safeStart = clampStartDay(startDay)
-        val nextStart = nextCycleStart(cycle.first, safeStart)
-        val end = nextCycleStart(nextStart, safeStart).minusDays(1)
+        val nextStart = nextCycleStart(cycle.first, safeStart, useJalali)
+        val end = nextCycleStart(nextStart, safeStart, useJalali).minusDays(1)
         return nextStart to end
     }
 
@@ -88,8 +103,13 @@ object BudgetCycle {
      * This is the cadence primitive — every other helper in this object is built on
      * it, which guarantees the cycles tile the timeline with no overlaps or gaps.
      */
-    fun nextCycleStart(reference: LocalDate, startDay: Int): LocalDate {
+    fun nextCycleStart(reference: LocalDate, startDay: Int, useJalali: Boolean = false): LocalDate {
         val safeStart = clampStartDay(startDay)
+        if (useJalali) {
+            val ym = JalaliYearMonth.from(reference)
+            val candidate = ym.atDaySafe(safeStart)
+            return if (!reference.isBefore(candidate)) ym.plusMonths(1).atDaySafe(safeStart) else candidate
+        }
         val ym = YearMonth.from(reference)
         val candidate = ym.atDay(1).withDayOfMonthSafe(safeStart)
         return if (!reference.isBefore(candidate)) {
@@ -120,5 +140,11 @@ object BudgetCycle {
     private fun LocalDate.withDayOfMonthSafe(day: Int): LocalDate {
         val max = lengthOfMonth()
         return withDayOfMonth(day.coerceAtMost(max))
+    }
+
+    /** Jalali analogue of [withDayOfMonthSafe] — clamps [day] to this Jalali month's length. */
+    private fun JalaliYearMonth.atDaySafe(day: Int): LocalDate {
+        val max = lengthOfMonth()
+        return atDay(day.coerceAtMost(max))
     }
 }

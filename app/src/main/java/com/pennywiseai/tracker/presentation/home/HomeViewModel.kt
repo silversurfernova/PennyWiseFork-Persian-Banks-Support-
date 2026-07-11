@@ -38,6 +38,7 @@ import com.pennywiseai.tracker.data.repository.LoanRepository
 import com.pennywiseai.tracker.data.repository.SubscriptionRepository
 import com.pennywiseai.tracker.data.repository.TransactionGroupRepository
 import com.pennywiseai.tracker.data.repository.TransactionRepository
+import com.pennywiseai.tracker.utils.DateFormatter
 import com.pennywiseai.tracker.utils.Money
 import com.pennywiseai.tracker.utils.sumByCurrency
 import com.pennywiseai.tracker.worker.OptimizedSmsReaderWorker
@@ -107,7 +108,9 @@ class HomeViewModel @Inject constructor(
      * same window the data is bucketed against.
      */
     private val _currentCycleWindow = MutableStateFlow(
-        BudgetCycle.currentCycle(LocalDate.now(), BudgetCycle.DEFAULT_START_DAY)
+        BudgetCycle.currentCycle(
+            LocalDate.now(), BudgetCycle.DEFAULT_START_DAY, useJalali = DateFormatter.useJalaliCalendar
+        )
     )
     val currentCycleWindow: StateFlow<Pair<LocalDate, LocalDate>> = _currentCycleWindow.asStateFlow()
 
@@ -161,9 +164,12 @@ class HomeViewModel @Inject constructor(
      * (or once on first emission). Cheap: just two `LocalDate` reads + arithmetic.
      */
     private fun observeBudgetCycle() {
-        userPreferencesRepository.budgetCycleStartDay
-            .onEach { startDay ->
-                _currentCycleWindow.value = BudgetCycle.currentCycle(LocalDate.now(), startDay)
+        combine(
+            userPreferencesRepository.budgetCycleStartDay,
+            userPreferencesRepository.useJalaliCalendar
+        ) { startDay, useJalali -> startDay to useJalali }
+            .onEach { (startDay, useJalali) ->
+                _currentCycleWindow.value = BudgetCycle.currentCycle(LocalDate.now(), startDay, useJalali)
             }
             .launchIn(viewModelScope)
     }
@@ -559,7 +565,9 @@ class HomeViewModel @Inject constructor(
             _currentCycleWindow
                 .flatMapLatest { current ->
                     val startDay = userPreferencesRepository.budgetCycleStartDay.first()
-                    val (lastMonthStart, lastMonthEnd) = BudgetCycle.previousCycle(current, startDay)
+                    val (lastMonthStart, lastMonthEnd) = BudgetCycle.previousCycle(
+                        current, startDay, useJalali = DateFormatter.useJalaliCalendar
+                    )
                     transactionRepository.getTransactionsBetweenDates(lastMonthStart, lastMonthEnd)
                 }
                 .combine(userPreferencesRepository.selectedProfileId) { transactions, profileId ->
@@ -581,7 +589,9 @@ class HomeViewModel @Inject constructor(
             _currentCycleWindow
                 .flatMapLatest { (firstOfMonth, cycleEnd) ->
                     val startDay = userPreferencesRepository.budgetCycleStartDay.first()
-                    val (lastMonthStart, _) = BudgetCycle.previousCycle(firstOfMonth to cycleEnd, startDay)
+                    val (lastMonthStart, _) = BudgetCycle.previousCycle(
+                        firstOfMonth to cycleEnd, startDay, useJalali = DateFormatter.useJalaliCalendar
+                    )
                     transactionRepository.getTransactionsBetweenDates(
                         startDate = lastMonthStart,
                         endDate = now
@@ -596,7 +606,10 @@ class HomeViewModel @Inject constructor(
                 .collect { allTransactions ->
                     val (firstOfMonth, _) = _currentCycleWindow.value
                     val startDay = userPreferencesRepository.budgetCycleStartDay.first()
-                    val (lastMonthStart, _) = BudgetCycle.previousCycle(firstOfMonth to _currentCycleWindow.value.second, startDay)
+                    val (lastMonthStart, _) = BudgetCycle.previousCycle(
+                        firstOfMonth to _currentCycleWindow.value.second, startDay,
+                        useJalali = DateFormatter.useJalaliCalendar
+                    )
                     val selectedCurrency = _uiState.value.selectedCurrency
                     val isUnified = _uiState.value.isUnifiedMode
 

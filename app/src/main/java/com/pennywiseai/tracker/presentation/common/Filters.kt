@@ -3,6 +3,8 @@ package com.pennywiseai.tracker.presentation.common
 import com.pennywiseai.tracker.data.database.entity.AccountBalanceEntity
 import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
+import com.pennywiseai.tracker.utils.DateFormatter
+import com.pennywiseai.tracker.utils.JalaliYearMonth
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -27,23 +29,41 @@ enum class TransactionTypeFilter(val label: String) {
     INVESTMENT("Investment")
 }
 
-fun getDateRangeForPeriod(period: TimePeriod): Pair<LocalDate, LocalDate>? {
+/**
+ * @param useJalali when true, THIS_WEEK/THIS_MONTH/LAST_MONTH boundaries follow the
+ * Jalali (Persian) calendar instead of Gregorian — defaults to the app-wide display
+ * preference so every caller stays consistent without having to thread it through
+ * explicitly. CURRENT_FY stays Gregorian (India's April-March tax year is a fixed
+ * fiscal concept, not a calendar system). Returned dates are always Gregorian —
+ * that's what transactions are stored/queried by.
+ */
+fun getDateRangeForPeriod(
+    period: TimePeriod,
+    useJalali: Boolean = DateFormatter.useJalaliCalendar
+): Pair<LocalDate, LocalDate>? {
     val today = LocalDate.now()
     return when (period) {
         TimePeriod.TODAY -> today to today
         TimePeriod.THIS_WEEK -> {
-            val start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            val start = if (useJalali) {
+                today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SATURDAY))
+            } else {
+                today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            }
             start to today
         }
         TimePeriod.THIS_MONTH -> {
-            val start = YearMonth.now().atDay(1)
+            val start = if (useJalali) JalaliYearMonth.from(today).atDay(1) else YearMonth.now().atDay(1)
             start to today
         }
         TimePeriod.LAST_MONTH -> {
-            val lastMonth = YearMonth.now().minusMonths(1)
-            val start = lastMonth.atDay(1)
-            val end = lastMonth.atEndOfMonth()
-            start to end
+            if (useJalali) {
+                val lastMonth = JalaliYearMonth.from(today).minusMonths(1)
+                lastMonth.atDay(1) to lastMonth.atEndOfMonth()
+            } else {
+                val lastMonth = YearMonth.now().minusMonths(1)
+                lastMonth.atDay(1) to lastMonth.atEndOfMonth()
+            }
         }
         TimePeriod.CURRENT_FY -> {
             // Indian Financial Year: April 1 to March 31

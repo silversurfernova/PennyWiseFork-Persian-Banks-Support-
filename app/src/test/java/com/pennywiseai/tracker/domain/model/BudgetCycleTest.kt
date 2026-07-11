@@ -1,5 +1,6 @@
 package com.pennywiseai.tracker.domain.model
 
+import com.pennywiseai.tracker.utils.JalaliYearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -112,5 +113,54 @@ class BudgetCycleTest {
 
         assertEquals(LocalDate.of(2026, 8, 25), prevStart)
         assertEquals(LocalDate.of(2026, 9, 24), prevEnd)
+    }
+
+    // ── Jalali (Persian) mode ──
+
+    @Test
+    fun `useJalali startDay 1 spans the Jalali calendar month, not the Gregorian one`() {
+        // 2026-07-11 falls in Jalali month Tir 1405, a 31-day month running
+        // 2026-06-22 through 2026-07-22 inclusive.
+        val today = LocalDate.of(2026, 7, 11)
+        val (start, end) = BudgetCycle.currentCycle(today, startDay = 1, useJalali = true)
+
+        val expectedStart = JalaliYearMonth.from(today).atDay(1)
+        val expectedEnd = JalaliYearMonth.from(today).atEndOfMonth()
+        assertEquals(expectedStart, start)
+        assertEquals(expectedEnd, end)
+        // Sanity: this must NOT equal the Gregorian calendar month.
+        assertEquals(LocalDate.of(2026, 6, 22), start)
+        assertEquals(LocalDate.of(2026, 7, 22), end)
+    }
+
+    @Test
+    fun `useJalali startDay 10 rolls to the previous Jalali month when today is before day 10`() {
+        // 1 Tir 1405 = 2026-06-22 (Jalali month start). Day 5 of that month is before
+        // startDay 10, so the cycle should still be running from the *previous*
+        // Jalali month's day 10.
+        val today = LocalDate.of(2026, 6, 26) // 5 Tir 1405
+        val (start, _) = BudgetCycle.currentCycle(today, startDay = 10, useJalali = true)
+
+        val expectedStart = JalaliYearMonth.from(today).minusMonths(1).atDay(10)
+        assertEquals(expectedStart, start)
+    }
+
+    @Test
+    fun `useJalali defaults to false so existing Gregorian callers are unaffected`() {
+        val today = LocalDate.of(2026, 10, 5)
+        val gregorian = BudgetCycle.currentCycle(today, startDay = 1)
+        val explicitGregorian = BudgetCycle.currentCycle(today, startDay = 1, useJalali = false)
+
+        assertEquals(gregorian, explicitGregorian)
+    }
+
+    @Test
+    fun `useJalali previousCycle and nextCycleStart mirror the Gregorian cadence in Jalali months`() {
+        val today = LocalDate.of(2026, 7, 11)
+        val current = BudgetCycle.currentCycle(today, startDay = 1, useJalali = true)
+        val (prevStart, prevEnd) = BudgetCycle.previousCycle(current, startDay = 1, useJalali = true)
+
+        assertEquals(JalaliYearMonth.from(today).minusMonths(1).atDay(1), prevStart)
+        assertEquals(current.first.minusDays(1), prevEnd)
     }
 }

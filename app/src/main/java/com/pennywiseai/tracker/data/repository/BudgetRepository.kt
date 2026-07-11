@@ -9,6 +9,7 @@ import com.pennywiseai.tracker.data.database.entity.BudgetPeriodType
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.TransactionWithSplits
 import com.pennywiseai.tracker.domain.model.BudgetCycle
+import com.pennywiseai.tracker.utils.DateFormatter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -281,7 +282,8 @@ class BudgetRepository @Inject constructor(
     fun calculatePeriodDates(
         periodType: BudgetPeriodType,
         customStartDate: LocalDate? = null,
-        startDay: Int = BudgetCycle.DEFAULT_START_DAY
+        startDay: Int = BudgetCycle.DEFAULT_START_DAY,
+        useJalali: Boolean = DateFormatter.useJalaliCalendar
     ): Pair<LocalDate, LocalDate> {
         val today = LocalDate.now()
         // When the caller pins a start date, ignore the global cycle and
@@ -297,7 +299,7 @@ class BudgetRepository @Inject constructor(
                 startOfWeek to endOfWeek
             }
             BudgetPeriodType.MONTHLY -> {
-                val (start, end) = BudgetCycle.currentCycle(today, startDay)
+                val (start, end) = BudgetCycle.currentCycle(today, startDay, useJalali)
                 start to end
             }
             BudgetPeriodType.CUSTOM -> {
@@ -323,7 +325,8 @@ class BudgetRepository @Inject constructor(
             periodType: BudgetPeriodType,
             customStartDate: LocalDate? = null,
             startDay: Int = BudgetCycle.DEFAULT_START_DAY,
-            today: LocalDate = LocalDate.now()
+            today: LocalDate = LocalDate.now(),
+            useJalali: Boolean = DateFormatter.useJalaliCalendar
         ): Pair<LocalDate, LocalDate> {
             if (customStartDate != null) {
                 return customStartDate to endDateFor(customStartDate, periodType)
@@ -335,7 +338,7 @@ class BudgetRepository @Inject constructor(
                     startOfWeek to endOfWeek
                 }
                 BudgetPeriodType.MONTHLY -> {
-                    val (start, end) = BudgetCycle.currentCycle(today, startDay)
+                    val (start, end) = BudgetCycle.currentCycle(today, startDay, useJalali)
                     start to end
                 }
                 BudgetPeriodType.CUSTOM -> {
@@ -361,14 +364,18 @@ class BudgetRepository @Inject constructor(
     /**
      * Renew a budget for the next period (for recurring budgets).
      */
-    suspend fun renewBudget(budget: BudgetEntity, startDay: Int = BudgetCycle.DEFAULT_START_DAY) {
+    suspend fun renewBudget(
+        budget: BudgetEntity,
+        startDay: Int = BudgetCycle.DEFAULT_START_DAY,
+        useJalali: Boolean = DateFormatter.useJalaliCalendar
+    ) {
         val (newStartDate, newEndDate) = when (budget.periodType) {
             BudgetPeriodType.WEEKLY -> {
                 budget.endDate.plusDays(1) to budget.endDate.plusDays(7)
             }
             BudgetPeriodType.MONTHLY -> {
-                val newStart = BudgetCycle.nextCycleStart(budget.endDate.plusDays(1), startDay)
-                val newEnd = BudgetCycle.nextCycleStart(newStart, startDay).minusDays(1)
+                val newStart = BudgetCycle.nextCycleStart(budget.endDate.plusDays(1), startDay, useJalali)
+                val newEnd = BudgetCycle.nextCycleStart(newStart, startDay, useJalali).minusDays(1)
                 newStart to newEnd
             }
             BudgetPeriodType.CUSTOM -> {
