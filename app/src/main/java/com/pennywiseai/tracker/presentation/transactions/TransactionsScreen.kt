@@ -1150,6 +1150,51 @@ private fun TransactionFilterHeader(
                     }
                 }
 
+                if (accountOptions.isNotEmpty()) {
+                    item {
+                        Box {
+                            val selectedAccountLabel =
+                                accountOptions.firstOrNull { it.key == accountFilter }?.label
+                            ExpressiveFilterChip(
+                                selected = accountFilter != null,
+                                text = selectedAccountLabel ?: "Account",
+                                icon = Icons.Outlined.AccountBalanceWallet,
+                                onClick = onAccountClick
+                            )
+
+                            DropdownMenu(
+                                expanded = showAccountMenu,
+                                onDismissRequest = onAccountDismiss
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("All accounts") },
+                                    leadingIcon = {
+                                        if (accountFilter == null) {
+                                            Icon(Icons.Default.Check, contentDescription = null)
+                                        } else {
+                                            Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null)
+                                        }
+                                    },
+                                    onClick = { onAccountSelected(null) }
+                                )
+                                accountOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        leadingIcon = {
+                                            if (accountFilter == option.key) {
+                                                Icon(Icons.Default.Check, contentDescription = null)
+                                            } else {
+                                                Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null)
+                                            }
+                                        },
+                                        onClick = { onAccountSelected(option.key) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 item {
                     Box {
                         ExpressiveFilterChip(
@@ -1226,51 +1271,6 @@ private fun TransactionFilterHeader(
                                     },
                                     onClick = { onProfileSelected(profile.id) }
                                 )
-                            }
-                        }
-                    }
-                }
-
-                if (accountOptions.isNotEmpty()) {
-                    item {
-                        Box {
-                            val selectedAccountLabel =
-                                accountOptions.firstOrNull { it.key == accountFilter }?.label
-                            ExpressiveFilterChip(
-                                selected = accountFilter != null,
-                                text = selectedAccountLabel ?: "Account",
-                                icon = Icons.Outlined.AccountBalanceWallet,
-                                onClick = onAccountClick
-                            )
-
-                            DropdownMenu(
-                                expanded = showAccountMenu,
-                                onDismissRequest = onAccountDismiss
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("All accounts") },
-                                    leadingIcon = {
-                                        if (accountFilter == null) {
-                                            Icon(Icons.Default.Check, contentDescription = null)
-                                        } else {
-                                            Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null)
-                                        }
-                                    },
-                                    onClick = { onAccountSelected(null) }
-                                )
-                                accountOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                        leadingIcon = {
-                                            if (accountFilter == option.key) {
-                                                Icon(Icons.Default.Check, contentDescription = null)
-                                            } else {
-                                                Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null)
-                                            }
-                                        },
-                                        onClick = { onAccountSelected(option.key) }
-                                    )
-                                }
                             }
                         }
                     }

@@ -424,7 +424,7 @@ fun BudgetGroupEditScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                val catInfo = CategoryMapping.categories[categoryName]
+                                                val catInfo = CategoryMapping.getCategoryInfoOrNull(categoryName)
                                                     ?: CategoryMapping.categories["Others"]!!
                                                 Box(
                                                     modifier = Modifier
@@ -453,7 +453,7 @@ fun BudgetGroupEditScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                val catInfo = CategoryMapping.categories[option.displayName]
+                                                val catInfo = CategoryMapping.getCategoryInfoOrNull(option.displayName)
                                                     ?: CategoryMapping.categories["Others"]!!
                                                 Box(
                                                     modifier = Modifier
@@ -719,7 +719,7 @@ private fun CategoryBudgetRow(
         mutableStateOf(if (amount.compareTo(BigDecimal.ZERO) == 0) "" else amount.toPlainString())
     }
 
-    val categoryInfo = CategoryMapping.categories[categoryName]
+    val categoryInfo = CategoryMapping.getCategoryInfoOrNull(categoryName)
         ?: CategoryMapping.categories["Others"]!!
 
     Row(

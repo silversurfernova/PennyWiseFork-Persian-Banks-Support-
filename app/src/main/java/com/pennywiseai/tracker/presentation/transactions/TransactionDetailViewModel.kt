@@ -102,6 +102,27 @@ class TransactionDetailViewModel @Inject constructor(
     private val _budgetCategory = MutableStateFlow<String?>(null)
     val budgetCategory: StateFlow<String?> = _budgetCategory.asStateFlow()
 
+    private val allMerchants: StateFlow<List<String>> = transactionRepository.getAllMerchants()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Merchant names from past transactions matching what's currently typed
+     * into the edit field, for the autocomplete dropdown. Excludes an exact
+     * match (nothing to suggest once it's already what you typed) and stays
+     * empty until you've typed something, so it's not just the whole list.
+     */
+    val merchantSuggestions: StateFlow<List<String>> = combine(
+        _editableTransaction, allMerchants
+    ) { txn, merchants ->
+        val query = txn?.merchantName?.trim().orEmpty()
+        if (query.isEmpty()) {
+            emptyList()
+        } else {
+            merchants.filter { it.contains(query, ignoreCase = true) && !it.equals(query, ignoreCase = true) }
+                .take(5)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val activeBudgetCategories: StateFlow<List<String>> = budgetGroupRepository.getActiveGroups()
         .map { groups ->
             groups.map { it.categories.map { cat -> cat.categoryName } }.flatten().distinct().sorted()
@@ -402,6 +423,32 @@ class TransactionDetailViewModel @Inject constructor(
     fun updateCategory(category: String) {
         _editableTransaction.update { current ->
             current?.copy(category = category.ifEmpty { "Others" })
+        }
+    }
+
+    /**
+     * Creates a new custom category (icon/color picked in the same dialog
+     * used from the Categories screen) and immediately selects it on the
+     * transaction being edited, so you never have to leave Transaction
+     * Details to add one.
+     */
+    fun createCategory(name: String, color: String, icon: String, isIncome: Boolean) {
+        viewModelScope.launch {
+            try {
+                if (categoryRepository.categoryExists(name)) {
+                    _errorMessage.value = "Category '$name' already exists"
+                    return@launch
+                }
+                categoryRepository.createCategory(
+                    name = name,
+                    color = color,
+                    icon = icon,
+                    isIncome = isIncome
+                )
+                updateCategory(name)
+            } catch (e: Exception) {
+                _errorMessage.value = "Error creating category: ${e.message}"
+            }
         }
     }
     

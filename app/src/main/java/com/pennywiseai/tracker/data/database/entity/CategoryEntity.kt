@@ -23,7 +23,17 @@ data class CategoryEntity(
     
     @ColumnInfo(name = "color")
     val color: String,
-    
+
+    /**
+     * Key into [com.pennywiseai.tracker.ui.icons.CategoryIconSet.icons] — never
+     * an ImageVector reference directly, so a key survives app updates. Blank
+     * for the built-in system categories, which keep using their hardcoded
+     * icon from [com.pennywiseai.tracker.ui.icons.CategoryMapping.categories]
+     * unless a user picks one explicitly.
+     */
+    @ColumnInfo(name = "icon", defaultValue = "")
+    val icon: String = "",
+
     @ColumnInfo(name = "is_system")
     val isSystem: Boolean = false,
     

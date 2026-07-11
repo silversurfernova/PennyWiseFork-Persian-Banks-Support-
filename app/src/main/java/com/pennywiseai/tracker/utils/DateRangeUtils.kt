@@ -1,22 +1,19 @@
 package com.pennywiseai.tracker.utils
 
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 /**
  * Utility functions for date range formatting
  */
 object DateRangeUtils {
 
-    private val defaultFormatter = DateTimeFormatter.ofPattern("MMM d")
-
     /**
-     * Formats a date range as a compact label string.
-     * Used for displaying custom date ranges in filter chips and UI.
+     * Formats a date range as a compact label string, honouring [DateFormatter]'s
+     * Gregorian/Jalali display preference. Used for displaying custom date ranges
+     * in filter chips and UI.
      *
      * @param startDate The start date of the range
      * @param endDate The end date of the range
-     * @param formatter Optional custom formatter (defaults to "MMM d" pattern)
      * @return Formatted string like "Jan 1 - Jan 31" or "Dec 25 - Jan 5"
      *
      * Example:
@@ -25,12 +22,8 @@ object DateRangeUtils {
      * // Returns: "Jan 1 - Jan 31"
      * ```
      */
-    fun formatDateRange(
-        startDate: LocalDate,
-        endDate: LocalDate,
-        formatter: DateTimeFormatter = defaultFormatter
-    ): String {
-        return "${startDate.format(formatter)} - ${endDate.format(formatter)}"
+    fun formatDateRange(startDate: LocalDate, endDate: LocalDate): String {
+        return "${DateFormatter.formatDayMonth(startDate)} - ${DateFormatter.formatDayMonth(endDate)}"
     }
 
     /**
@@ -38,15 +31,11 @@ object DateRangeUtils {
      * Returns null if the pair is null.
      *
      * @param dateRange Optional pair of start and end dates
-     * @param formatter Optional custom formatter (defaults to "MMM d" pattern)
      * @return Formatted string or null if dateRange is null
      */
-    fun formatDateRange(
-        dateRange: Pair<LocalDate, LocalDate>?,
-        formatter: DateTimeFormatter = defaultFormatter
-    ): String? {
+    fun formatDateRange(dateRange: Pair<LocalDate, LocalDate>?): String? {
         return dateRange?.let { (start, end) ->
-            formatDateRange(start, end, formatter)
+            formatDateRange(start, end)
         }
     }
 }

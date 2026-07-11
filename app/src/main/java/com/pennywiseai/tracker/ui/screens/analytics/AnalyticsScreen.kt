@@ -836,7 +836,7 @@ private fun CategoryListItem(
     category: CategoryData,
     currency: String
 ) {
-    val categoryInfo = CategoryMapping.categories[category.name]
+    val categoryInfo = CategoryMapping.getCategoryInfoOrNull(category.name)
         ?: CategoryMapping.categories["Others"]!!
 
     ListItemCardV2(

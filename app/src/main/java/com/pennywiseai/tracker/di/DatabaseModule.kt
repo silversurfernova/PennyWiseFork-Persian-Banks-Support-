@@ -23,6 +23,7 @@ import com.pennywiseai.tracker.data.database.dao.RuleDao
 import com.pennywiseai.tracker.data.database.dao.SubscriptionDao
 import com.pennywiseai.tracker.data.database.dao.TransactionDao
 import com.pennywiseai.tracker.data.database.dao.TransactionSplitDao
+import com.pennywiseai.tracker.data.database.dao.TransactionTypeRuleDao
 import com.pennywiseai.tracker.data.database.dao.UnrecognizedSmsDao
 import dagger.Module
 import dagger.Provides
@@ -157,6 +158,18 @@ object DatabaseModule {
     @Singleton
     fun provideUnrecognizedSmsDao(database: PennyWiseDatabase): UnrecognizedSmsDao {
         return database.unrecognizedSmsDao()
+    }
+
+    /**
+     * Provides the TransactionTypeRuleDao from the database.
+     *
+     * @param database The PennyWiseDatabase instance
+     * @return TransactionTypeRuleDao for accessing user-taught classification rules
+     */
+    @Provides
+    @Singleton
+    fun provideTransactionTypeRuleDao(database: PennyWiseDatabase): TransactionTypeRuleDao {
+        return database.transactionTypeRuleDao()
     }
     
     /**

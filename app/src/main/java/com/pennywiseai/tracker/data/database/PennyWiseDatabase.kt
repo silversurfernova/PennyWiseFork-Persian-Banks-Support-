@@ -28,6 +28,7 @@ import com.pennywiseai.tracker.data.database.dao.RuleDao
 import com.pennywiseai.tracker.data.database.dao.SubscriptionDao
 import com.pennywiseai.tracker.data.database.dao.TransactionDao
 import com.pennywiseai.tracker.data.database.dao.TransactionSplitDao
+import com.pennywiseai.tracker.data.database.dao.TransactionTypeRuleDao
 import com.pennywiseai.tracker.data.database.dao.UnrecognizedSmsDao
 import com.pennywiseai.tracker.data.database.entity.AccountBalanceEntity
 import com.pennywiseai.tracker.data.database.entity.ProfileEntity
@@ -48,6 +49,7 @@ import com.pennywiseai.tracker.data.database.entity.RuleEntity
 import com.pennywiseai.tracker.data.database.entity.SubscriptionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionSplitEntity
+import com.pennywiseai.tracker.data.database.entity.TransactionTypeRuleEntity
 import com.pennywiseai.tracker.data.database.entity.UnrecognizedSmsEntity
 
 /**
@@ -57,7 +59,7 @@ import com.pennywiseai.tracker.data.database.entity.UnrecognizedSmsEntity
  * that needs to record the version it was exported against. Bump this in lock-
  * step with any schema change.
  */
-const val SCHEMA_VERSION = 55
+const val SCHEMA_VERSION = 57
 
 /**
  * The PennyWise Room database.
@@ -70,7 +72,7 @@ const val SCHEMA_VERSION = 55
  * @property autoMigrations List of automatic migrations between versions.
  */
 @Database(
-    entities = [TransactionEntity::class, SubscriptionEntity::class, ChatMessage::class, MerchantMappingEntity::class, CategoryEntity::class, AccountBalanceEntity::class, UnrecognizedSmsEntity::class, CardEntity::class, RuleEntity::class, RuleApplicationEntity::class, ExchangeRateEntity::class, BudgetEntity::class, BudgetCategoryEntity::class, BudgetMonthSnapshotEntity::class, BudgetCategoryMonthSnapshotEntity::class, TransactionSplitEntity::class, BankNotificationEntity::class, LoanEntity::class, TransactionGroupEntity::class, ProfileEntity::class],
+    entities = [TransactionEntity::class, SubscriptionEntity::class, ChatMessage::class, MerchantMappingEntity::class, CategoryEntity::class, AccountBalanceEntity::class, UnrecognizedSmsEntity::class, CardEntity::class, RuleEntity::class, RuleApplicationEntity::class, ExchangeRateEntity::class, BudgetEntity::class, BudgetCategoryEntity::class, BudgetMonthSnapshotEntity::class, BudgetCategoryMonthSnapshotEntity::class, TransactionSplitEntity::class, BankNotificationEntity::class, LoanEntity::class, TransactionGroupEntity::class, ProfileEntity::class, TransactionTypeRuleEntity::class],
     version = SCHEMA_VERSION,
     exportSchema = true,
     autoMigrations = [
@@ -113,9 +115,11 @@ const val SCHEMA_VERSION = 55
         AutoMigration(from = 40, to = 41),
         AutoMigration(from = 41, to = 42),
         AutoMigration(from = 42, to = 43),
-        AutoMigration(from = 43, to = 44, spec = Migration43To44::class)
+        AutoMigration(from = 43, to = 44, spec = Migration43To44::class),
         // 44→45, 45→46 and 46→47 are manual migrations registered in DatabaseModule
         // (profile_id columns and loan_contribution column).
+        AutoMigration(from = 55, to = 56),
+        AutoMigration(from = 56, to = 57)
     ]
 )
 @TypeConverters(Converters::class)
@@ -138,6 +142,7 @@ abstract class PennyWiseDatabase : RoomDatabase() {
     abstract fun transactionGroupDao(): TransactionGroupDao
     abstract fun budgetSnapshotDao(): BudgetSnapshotDao
     abstract fun profileDao(): ProfileDao
+    abstract fun transactionTypeRuleDao(): TransactionTypeRuleDao
 
     companion object {
         const val DATABASE_NAME = "pennywise_database"

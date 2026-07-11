@@ -95,3 +95,19 @@ fun com.pennywiseai.parser.core.TransactionType.toEntityType(): TransactionType 
         com.pennywiseai.parser.core.TransactionType.BALANCE_UPDATE -> TransactionType.EXPENSE
     }
 }
+
+/**
+ * Reverse of [toEntityType]. Used to feed a user-taught classification rule
+ * (stored using the entity's [TransactionType]) back into
+ * `BankParser.parseWithResolvedType`, which works in parser-core's own type.
+ * There's no entity-side BALANCE_UPDATE, so every entity type maps 1:1.
+ */
+fun TransactionType.toParserCoreType(): com.pennywiseai.parser.core.TransactionType {
+    return when (this) {
+        TransactionType.INCOME -> com.pennywiseai.parser.core.TransactionType.INCOME
+        TransactionType.EXPENSE -> com.pennywiseai.parser.core.TransactionType.EXPENSE
+        TransactionType.CREDIT -> com.pennywiseai.parser.core.TransactionType.CREDIT
+        TransactionType.TRANSFER -> com.pennywiseai.parser.core.TransactionType.TRANSFER
+        TransactionType.INVESTMENT -> com.pennywiseai.parser.core.TransactionType.INVESTMENT
+    }
+}

@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Store
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.pennywiseai.shared.domain.mapping.SharedCategoryMapping
+import com.pennywiseai.tracker.data.database.entity.CategoryEntity
 
 /**
  * Category visual properties (icons, colors) for Android UI.
@@ -192,6 +193,41 @@ object CategoryMapping {
     fun getCategory(merchantName: String): String {
         return SharedCategoryMapping.getCategory(merchantName)
     }
+
+    /**
+     * User-created categories that picked an icon (name -> visual info), kept
+     * in sync from the DB via [updateCustomCategories]. [categories] above
+     * covers the fixed set of built-in system categories only; this is where
+     * a custom category's own chosen icon/color live once assigned. @Volatile
+     * because it's refreshed from an application-scoped coroutine (see
+     * PennyWiseApplication) and read from arbitrary composition threads —
+     * same pattern as CurrencyFormatter.numberFormatStyle.
+     */
+    @Volatile
+    private var customCategories: Map<String, CategoryInfo> = emptyMap()
+
+    fun updateCustomCategories(allCategories: List<CategoryEntity>) {
+        customCategories = allCategories
+            .filter { it.icon.isNotBlank() }
+            .associate { entity ->
+                val icon = CategoryIconSet.icons[entity.icon] ?: CategoryIconSet.fallback
+                val color = try {
+                    Color(android.graphics.Color.parseColor(entity.color))
+                } catch (e: Exception) {
+                    Color(0xFF757575)
+                }
+                entity.name to CategoryInfo(displayName = entity.name, icon = icon, color = color)
+            }
+    }
+
+    /**
+     * Looks up visual info for [name]: a built-in system category first, then
+     * a user-taught custom-category icon/color, or null if neither has one
+     * (callers fall back to `categories["Others"]`). Nullable name accepted
+     * to match how `Map.get` was used at call sites before this existed.
+     */
+    fun getCategoryInfoOrNull(name: String?): CategoryInfo? =
+        name?.let { categories[it] ?: customCategories[it] }
 }
 
 /**
@@ -211,7 +247,7 @@ object IconProvider {
         }
 
         val category = CategoryMapping.getCategory(merchantName)
-        val categoryInfo = CategoryMapping.categories[category]
+        val categoryInfo = CategoryMapping.getCategoryInfoOrNull(category)
             ?: CategoryMapping.categories["Others"]!!
 
         return IconResource.VectorIcon(
@@ -225,7 +261,7 @@ object IconProvider {
      */
     fun getCategoryInfo(merchantName: String): CategoryMapping.CategoryInfo {
         val category = CategoryMapping.getCategory(merchantName)
-        return CategoryMapping.categories[category]
+        return CategoryMapping.getCategoryInfoOrNull(category)
             ?: CategoryMapping.categories["Others"]!!
     }
 
@@ -244,7 +280,7 @@ object IconProvider {
         val effectiveCategory = if (category.isValidCategoryOverride()) category
             else CategoryMapping.getCategory(merchantName)
 
-        val categoryInfo = CategoryMapping.categories[effectiveCategory]
+        val categoryInfo = CategoryMapping.getCategoryInfoOrNull(effectiveCategory)
             ?: CategoryMapping.categories["Others"]!!
 
         return IconResource.VectorIcon(

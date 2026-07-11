@@ -9,13 +9,17 @@ import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.CardType
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
+import com.pennywiseai.tracker.data.database.entity.UnrecognizedSmsEntity
 import com.pennywiseai.tracker.data.mapper.toEntity
 import com.pennywiseai.tracker.data.mapper.toEntityType
+import com.pennywiseai.tracker.data.mapper.toParserCoreType
 import com.pennywiseai.tracker.data.repository.AccountBalanceRepository
 import com.pennywiseai.tracker.data.repository.CardRepository
 import com.pennywiseai.tracker.data.repository.MerchantMappingRepository
 import com.pennywiseai.tracker.data.repository.SubscriptionRepository
 import com.pennywiseai.tracker.data.repository.TransactionRepository
+import com.pennywiseai.tracker.data.repository.TransactionTypeRuleRepository
+import com.pennywiseai.tracker.data.repository.UnrecognizedSmsRepository
 import com.pennywiseai.tracker.domain.repository.RuleRepository
 import com.pennywiseai.tracker.domain.service.RuleEngine
 import java.math.BigDecimal
@@ -39,7 +43,9 @@ class SmsTransactionProcessor @Inject constructor(
     private val merchantMappingRepository: MerchantMappingRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val ruleRepository: RuleRepository,
-    private val ruleEngine: RuleEngine
+    private val ruleEngine: RuleEngine,
+    private val transactionTypeRuleRepository: TransactionTypeRuleRepository,
+    private val unrecognizedSmsRepository: UnrecognizedSmsRepository
 ) {
     companion object {
         private const val TAG = "SmsTransactionProcessor"
@@ -78,9 +84,8 @@ class SmsTransactionProcessor @Inject constructor(
 
             // Parse the SMS
             val parsedTransaction = parsers.firstNotNullOfOrNull { it.parse(body, sender, timestamp) }
-            if (parsedTransaction == null) {
-                return ProcessingResult(false, reason = "Could not parse transaction from SMS")
-            }
+                ?: resolveViaTypeRuleOrStorePending(parsers, sender, body, timestamp)
+                ?: return ProcessingResult(false, reason = "Could not parse transaction from SMS")
 
             Log.d(TAG, "Parsed transaction: ${parsedTransaction.amount} from ${parsedTransaction.bankName}")
 
@@ -90,6 +95,49 @@ class SmsTransactionProcessor @Inject constructor(
             Log.e(TAG, "Error processing SMS", e)
             return ProcessingResult(false, reason = e.message)
         }
+    }
+
+    /**
+     * Called when none of [parsers] could resolve a transaction type on their
+     * own. Checks a user-taught rule (keyed on the bank's own raw label, e.g.
+     * Tejarat's "نوع تراکنش:" value) before giving up; if no rule matches but
+     * the message is nameable via [com.pennywiseai.parser.core.bank.BankParser.isPendingClassification],
+     * stores it for manual classification instead of losing it silently.
+     */
+    private suspend fun resolveViaTypeRuleOrStorePending(
+        parsers: List<com.pennywiseai.parser.core.bank.BankParser>,
+        sender: String,
+        body: String,
+        timestamp: Long
+    ): ParsedTransaction? {
+        for (parser in parsers) {
+            val rawLabel = parser.extractRawTypeLabel(body) ?: continue
+            val bankName = parser.getBankName()
+
+            val ruleType = transactionTypeRuleRepository.loadCache()[bankName to rawLabel]
+            if (ruleType != null) {
+                parser.parseWithResolvedType(body, sender, timestamp, ruleType.toParserCoreType())
+                    ?.let { return it }
+            }
+
+            if (parser.isPendingClassification(body)) {
+                try {
+                    unrecognizedSmsRepository.insert(
+                        UnrecognizedSmsEntity(
+                            sender = sender,
+                            smsBody = body,
+                            receivedAt = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault()),
+                            bankName = bankName,
+                            rawTypeLabel = rawLabel
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error storing pending classification: ${e.message}")
+                }
+                return null
+            }
+        }
+        return null
     }
 
     /**

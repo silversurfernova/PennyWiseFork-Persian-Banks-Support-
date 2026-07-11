@@ -48,4 +48,13 @@ interface UnrecognizedSmsDao {
     
     @Query("SELECT * FROM unrecognized_sms WHERE sender = :sender AND sms_body = :smsBody LIMIT 1")
     suspend fun findBySenderAndBody(sender: String, smsBody: String): UnrecognizedSmsEntity?
+
+    /**
+     * Recognized-bank messages that couldn't be classified (bank_name set),
+     * as opposed to the classic totally-unrecognized-sender case (bank_name
+     * null). Surfaced separately so the review screen can offer "classify as
+     * Income/Expense" instead of just delete.
+     */
+    @Query("SELECT * FROM unrecognized_sms WHERE bank_name IS NOT NULL AND is_deleted = 0 ORDER BY received_at DESC")
+    fun getPendingClassification(): Flow<List<UnrecognizedSmsEntity>>
 }

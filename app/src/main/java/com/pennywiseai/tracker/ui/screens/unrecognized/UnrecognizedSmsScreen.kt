@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.UnrecognizedSmsEntity
 import com.pennywiseai.tracker.ui.components.CustomTitleTopAppBar
 import com.pennywiseai.tracker.ui.components.PennyWiseEmptyState
@@ -56,6 +57,13 @@ fun UnrecognizedSmsScreen(
     val scrollBehaviorLarge = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val hazeState = remember { HazeState() }
     val lazyListState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.classifyError.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     // Staggered entrance animation state — only animates on first composition
     var hasAnimated by rememberSaveable { mutableStateOf(false) }
@@ -72,6 +80,7 @@ fun UnrecognizedSmsScreen(
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehaviorLarge.nestedScrollConnection),
         containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             CustomTitleTopAppBar(
                 scrollBehaviorSmall = scrollBehaviorSmall,
@@ -229,6 +238,9 @@ fun UnrecognizedSmsScreen(
                             onDelete = {
                                 selectedMessage = message
                                 showDeleteConfirmation = true
+                            },
+                            onClassify = { type ->
+                                viewModel.classifyMessage(message, type)
                             }
                         )
                     }
@@ -281,8 +293,10 @@ private fun UnrecognizedSmsItem(
     message: UnrecognizedSmsEntity,
     onReport: () -> Unit,
     onDelete: () -> Unit,
+    onClassify: (TransactionType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isPendingClassification = message.bankName != null && message.rawTypeLabel != null
     PennyWiseCardV2(
         modifier = modifier.fillMaxWidth()
     ) {
@@ -311,7 +325,16 @@ private fun UnrecognizedSmsItem(
                     )
                 }
 
-                if (message.reported) {
+                if (isPendingClassification) {
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ) {
+                        Text(
+                            "Needs classification",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                } else if (message.reported) {
                     Badge(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ) {
@@ -321,6 +344,14 @@ private fun UnrecognizedSmsItem(
                         )
                     }
                 }
+            }
+
+            if (isPendingClassification) {
+                Text(
+                    text = "${message.bankName} — \"${message.rawTypeLabel}\"",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
             }
 
             // Message content (truncated)
@@ -338,7 +369,27 @@ private fun UnrecognizedSmsItem(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!message.reported) {
+                if (isPendingClassification) {
+                    TextButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            modifier = Modifier.size(Dimensions.Icon.small)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+
+                    OutlinedButton(onClick = { onClassify(TransactionType.EXPENSE) }) {
+                        Text("Expense")
+                    }
+
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+
+                    FilledTonalButton(onClick = { onClassify(TransactionType.INCOME) }) {
+                        Text("Income")
+                    }
+                } else if (!message.reported) {
                     TextButton(
                         onClick = onDelete
                     ) {

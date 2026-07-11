@@ -42,8 +42,22 @@ data class UnrecognizedSmsEntity(
     
     @ColumnInfo(name = "is_deleted", defaultValue = "0")
     val isDeleted: Boolean = false,
-    
+
     @ColumnInfo(name = "created_at")
     @Contextual
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    /**
+     * Set only when this entry is a *recognized* bank's message that couldn't
+     * be classified (see `BankParser.isPendingClassification` in parser-core)
+     * — as opposed to the classic case of a totally unrecognized sender, where
+     * this stays null. Paired with [rawTypeLabel] to let the review screen
+     * offer "classify as Income/Expense" instead of just delete.
+     */
+    @ColumnInfo(name = "bank_name")
+    val bankName: String? = null,
+
+    /** The bank's raw, unmapped transaction-type label (e.g. Tejarat's "نوع تراکنش:" value). */
+    @ColumnInfo(name = "raw_type_label")
+    val rawTypeLabel: String? = null
 )

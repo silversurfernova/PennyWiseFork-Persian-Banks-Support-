@@ -23,6 +23,7 @@ import com.pennywiseai.tracker.ui.sharedElementIcon
 import com.pennywiseai.tracker.ui.components.BrandIcon
 import com.pennywiseai.tracker.ui.theme.*
 import com.pennywiseai.tracker.utils.CurrencyFormatter
+import com.pennywiseai.tracker.utils.DateFormatter
 import com.pennywiseai.tracker.utils.formatAmount
 import java.math.BigDecimal
 import java.time.format.DateTimeFormatter
@@ -55,11 +56,10 @@ fun TransactionItem(
         }
     }
 
-    val dateTimeFormatter = remember(showDate) {
-        DateTimeFormatter.ofPattern(if (showDate) "d MMM \u00B7 h:mm a" else "h:mm a")
-    }
-    val dateTimeText = remember(transaction.dateTime, dateTimeFormatter) {
-        transaction.dateTime.format(dateTimeFormatter)
+    val timeOnlyFormatter = remember { DateTimeFormatter.ofPattern("h:mm a") }
+    val dateTimeText = remember(transaction.dateTime, showDate, DateFormatter.useJalaliCalendar) {
+        if (showDate) DateFormatter.formatDayMonthTime(transaction.dateTime)
+        else transaction.dateTime.format(timeOnlyFormatter)
     }
 
     val isEffectivelyBusiness = remember(transaction, profileAccountKeys) {

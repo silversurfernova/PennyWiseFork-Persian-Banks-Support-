@@ -153,8 +153,8 @@ fun CategoriesScreen(
         CategoryEditDialog(
             category = editingCategory,
             onDismiss = { viewModel.hideDialog() },
-            onSave = { name, color, isIncome ->
-                viewModel.saveCategory(name, color, isIncome)
+            onSave = { name, color, icon, isIncome ->
+                viewModel.saveCategory(name, color, icon, isIncome)
             },
             onDelete = editingCategory?.let { cat ->
                 {

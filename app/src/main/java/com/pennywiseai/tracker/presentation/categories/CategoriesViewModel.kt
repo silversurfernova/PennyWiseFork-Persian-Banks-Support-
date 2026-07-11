@@ -59,18 +59,20 @@ class CategoriesViewModel @Inject constructor(
     fun saveCategory(
         name: String,
         color: String,
+        icon: String,
         isIncome: Boolean
     ) {
         viewModelScope.launch {
             try {
                 val editingCat = _editingCategory.value
-                
+
                 if (editingCat != null) {
                     // Update existing category
                     categoryRepository.updateCategory(
                         editingCat.copy(
                             name = name,
                             color = color,
+                            icon = icon,
                             isIncome = isIncome
                         )
                     )
@@ -81,16 +83,17 @@ class CategoriesViewModel @Inject constructor(
                         _snackbarMessage.value = "Category '$name' already exists"
                         return@launch
                     }
-                    
+
                     // Create new category
                     categoryRepository.createCategory(
                         name = name,
                         color = color,
+                        icon = icon,
                         isIncome = isIncome
                     )
                     _snackbarMessage.value = "Category created successfully"
                 }
-                
+
                 hideDialog()
             } catch (e: Exception) {
                 _snackbarMessage.value = "Error saving category: ${e.message}"

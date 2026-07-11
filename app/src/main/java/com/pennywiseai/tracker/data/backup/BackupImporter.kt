@@ -129,6 +129,7 @@ class BackupImporter @Inject constructor(
                 database.transactionGroupDao().deleteAllGroups()
                 database.budgetSnapshotDao().deleteAllGroupSnapshots()
                 database.budgetSnapshotDao().deleteAllCategorySnapshots()
+                database.transactionTypeRuleDao().deleteAll()
                 // Note: budget categories and transaction splits are deleted via cascade (budget categories via budget deletion, transaction splits via transaction deletion)
                 // Profiles deliberately preserved — defaults (Personal=1, Business=2)
                 // are seeded on first launch and we don't want to wipe them.
@@ -240,6 +241,9 @@ class BackupImporter @Inject constructor(
                 }
                 backup.database.bankNotifications.insertEachCounting({ skippedRows++ }) { notification ->
                     database.bankNotificationDao().insertOrReplace(notification)
+                }
+                backup.database.transactionTypeRules.insertEachCounting({ skippedRows++ }) { rule ->
+                    database.transactionTypeRuleDao().upsert(rule)
                 }
 
                 // Profiles were already imported earlier (before transactions /
@@ -440,6 +444,13 @@ class BackupImporter @Inject constructor(
                 }
                 backup.database.bankNotifications.insertEachCounting({ skippedRows++ }) { notification ->
                     database.bankNotificationDao().insertOrReplace(notification)
+                }
+                backup.database.transactionTypeRules.insertEachCounting({ skippedRows++ }) { rule ->
+                    // Skip if a local rule already exists for this (bank, label) pair
+                    // (preserves a locally-taught rule over the backup's).
+                    if (database.transactionTypeRuleDao().find(rule.bankName, rule.rawTypeLabel) == null) {
+                        database.transactionTypeRuleDao().upsert(rule)
+                    }
                 }
 
                 // Profiles were already imported earlier (before transactions /

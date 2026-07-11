@@ -724,7 +724,7 @@ private fun BudgetCard(
                             else -> MaterialTheme.colorScheme.primary
                         }
 
-                        val categoryInfo = CategoryMapping.categories[catSpending.categoryName]
+                        val categoryInfo = CategoryMapping.getCategoryInfoOrNull(catSpending.categoryName)
                             ?: CategoryMapping.categories["Others"]!!
 
                         Row(

@@ -29,6 +29,12 @@ class UnrecognizedSmsRepository @Inject constructor(
      * Get all visible messages (including reported, excluding deleted)
      */
     fun getAllVisible(): Flow<List<UnrecognizedSmsEntity>> = dao.getAllVisible()
+
+    /**
+     * Recognized-bank messages that couldn't be classified — see
+     * [UnrecognizedSmsEntity.bankName]/[UnrecognizedSmsEntity.rawTypeLabel].
+     */
+    fun getPendingClassification(): Flow<List<UnrecognizedSmsEntity>> = dao.getPendingClassification()
     
     /**
      * Get first unreported message

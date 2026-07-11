@@ -135,6 +135,13 @@ class UserPreferencesRepository @Inject constructor(
 
         // UPI VPA → contact name lookup (opt-in; gated by READ_CONTACTS).
         val USE_CONTACTS_FOR_VPA = booleanPreferencesKey("use_contacts_for_vpa")
+
+        // Transactions screen — last selected time-period filter (TimePeriod.name),
+        // persisted so "Today"/"This Week" etc. survive app restarts.
+        val TRANSACTIONS_SELECTED_PERIOD = stringPreferencesKey("transactions_selected_period")
+
+        // Display all dates using the Jalali (Persian) calendar instead of Gregorian.
+        val USE_JALALI_CALENDAR = booleanPreferencesKey("use_jalali_calendar")
     }
 
     val userPreferences: Flow<UserPreferences> = context.dataStore.data
@@ -747,6 +754,26 @@ class UserPreferencesRepository @Inject constructor(
             } else {
                 preferences[PreferencesKeys.MAIN_ACCOUNT_KEY] = accountKey
             }
+        }
+    }
+
+    // Transactions screen — persisted time-period filter
+    val transactionsSelectedPeriod: Flow<String?> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.TRANSACTIONS_SELECTED_PERIOD] }
+
+    suspend fun updateTransactionsSelectedPeriod(periodName: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.TRANSACTIONS_SELECTED_PERIOD] = periodName
+        }
+    }
+
+    // Persian (Jalali) calendar display
+    val useJalaliCalendar: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.USE_JALALI_CALENDAR] ?: false }
+
+    suspend fun setUseJalaliCalendar(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.USE_JALALI_CALENDAR] = enabled
         }
     }
 }

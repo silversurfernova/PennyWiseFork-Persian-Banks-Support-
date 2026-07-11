@@ -125,7 +125,7 @@ fun CategoryIcon(
     size: Dp = 24.dp,
     tint: Color? = null
 ) {
-    val categoryInfo = CategoryMapping.categories[category]
+    val categoryInfo = CategoryMapping.getCategoryInfoOrNull(category)
         ?: CategoryMapping.categories["Others"]!!
     
     Icon(

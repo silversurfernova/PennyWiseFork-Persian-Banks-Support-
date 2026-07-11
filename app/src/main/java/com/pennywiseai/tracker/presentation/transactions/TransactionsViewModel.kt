@@ -789,6 +789,14 @@ class TransactionsViewModel @Inject constructor(
 
     fun selectPeriod(period: TimePeriod) {
         _selectedPeriod.value = period
+        // CUSTOM's actual range lives in SavedStateHandle (see setCustomDateRange),
+        // not DataStore, so persisting the bare enum name here would restore to a
+        // dateless CUSTOM on next launch. Skip it; every other period is self-contained.
+        if (period != TimePeriod.CUSTOM) {
+            viewModelScope.launch {
+                userPreferencesRepository.updateTransactionsSelectedPeriod(period.name)
+            }
+        }
     }
     
     fun setCategoryFilter(category: String) {
@@ -915,6 +923,16 @@ class TransactionsViewModel @Inject constructor(
         } else value
     }
 
+    private fun parseTimePeriodName(name: String): TimePeriod? = when (name) {
+        "TODAY" -> TimePeriod.TODAY
+        "THIS_WEEK" -> TimePeriod.THIS_WEEK
+        "THIS_MONTH" -> TimePeriod.THIS_MONTH
+        "LAST_MONTH" -> TimePeriod.LAST_MONTH
+        "CURRENT_FY" -> TimePeriod.CURRENT_FY
+        "ALL" -> TimePeriod.ALL
+        else -> null
+    }
+
     fun applyInitialFilters(
         category: String?,
         merchant: String?,
@@ -925,9 +943,22 @@ class TransactionsViewModel @Inject constructor(
             // Only apply filters once, when first navigating to the screen
             clearCategoryFilter()
             updateSearchQuery("")
-            selectPeriod(TimePeriod.THIS_MONTH)
             setTransactionTypeFilter(TransactionTypeFilter.ALL)
             setSortOption(SortOption.DATE_NEWEST)
+
+            // A nav-provided period (e.g. from Home/Analytics) always wins; otherwise
+            // restore whatever period the user had selected last session (#today/this-week
+            // persistence), falling back to THIS_MONTH if nothing was ever saved.
+            val navPeriod = period?.let(::parseTimePeriodName)
+            if (navPeriod != null) {
+                selectPeriod(navPeriod)
+            } else {
+                viewModelScope.launch {
+                    val persisted = userPreferencesRepository.transactionsSelectedPeriod.first()
+                        ?.let(::parseTimePeriodName)
+                    selectPeriod(persisted ?: TimePeriod.THIS_MONTH)
+                }
+            }
 
             category?.let {
                 val decoded = decodeUrlParam(it)
@@ -937,17 +968,6 @@ class TransactionsViewModel @Inject constructor(
             merchant?.let {
                 val decoded = decodeUrlParam(it)
                 updateSearchQuery(decoded)
-            }
-
-            period?.let { periodName ->
-                val timePeriod = when (periodName) {
-                    "THIS_MONTH" -> TimePeriod.THIS_MONTH
-                    "LAST_MONTH" -> TimePeriod.LAST_MONTH
-                    "CURRENT_FY" -> TimePeriod.CURRENT_FY
-                    "ALL" -> TimePeriod.ALL
-                    else -> null
-                }
-                timePeriod?.let { selectPeriod(it) }
             }
 
             // Only set currency if it's provided (from navigation)
@@ -995,14 +1015,7 @@ class TransactionsViewModel @Inject constructor(
         }
 
         period?.let { periodName ->
-            val timePeriod = when (periodName) {
-                "THIS_MONTH" -> TimePeriod.THIS_MONTH
-                "LAST_MONTH" -> TimePeriod.LAST_MONTH
-                "CURRENT_FY" -> TimePeriod.CURRENT_FY
-                "ALL" -> TimePeriod.ALL
-                else -> null
-            }
-            timePeriod?.let { selectPeriod(it) }
+            parseTimePeriodName(periodName)?.let { selectPeriod(it) }
         }
 
         // Only set currency if it's provided (from navigation)

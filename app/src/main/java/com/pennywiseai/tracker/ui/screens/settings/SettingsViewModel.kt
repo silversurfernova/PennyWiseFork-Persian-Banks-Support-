@@ -101,6 +101,9 @@ class SettingsViewModel @Inject constructor(
     // Replace UPI VPAs with contact names (gated by READ_CONTACTS).
     val useContactsForVpa = userPreferencesRepository.useContactsForVpa
 
+    // Display all dates using the Jalali (Persian) calendar instead of Gregorian.
+    val useJalaliCalendar = userPreferencesRepository.useJalaliCalendar
+
     // Derive the selectable set from the user's ACTUAL data (transaction + account
     // currencies) on top of the common seed list. This way any currency the user
     // really holds — e.g. MZN held only in an account — is always selectable, instead
@@ -482,7 +485,13 @@ class SettingsViewModel @Inject constructor(
             contactsResolver.clearCache()
         }
     }
-    
+
+    fun setUseJalaliCalendar(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setUseJalaliCalendar(enabled)
+        }
+    }
+
     fun updateSmsScanMonths(months: Int) {
         viewModelScope.launch {
             val currentMonths = userPreferencesRepository.getSmsScanMonths()

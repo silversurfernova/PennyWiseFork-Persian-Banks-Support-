@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,140 +78,106 @@ fun TransactionTotalsCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(Spacing.sm)
+                    .padding(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
-                // Totals Row
-                Row(
+                // Income row
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(
+                                topStart = Spacing.md,
+                                topEnd = Spacing.md,
+                                bottomStart = Spacing.xs,
+                                bottomEnd = Spacing.xs
+                            )
+                        )
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm)
                 ) {
-                    // Income Column
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                shape = RoundedCornerShape(
-                                    topEnd = Spacing.xs,
-                                    topStart = Spacing.md,
-                                    bottomEnd = Spacing.xs,
-                                    bottomStart = Spacing.md
-                                )
+                    TotalRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.TrendingUp,
+                                contentDescription = "Income",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (!isSystemInDarkTheme()) income_light else income_dark
                             )
-                            .padding(Spacing.sm),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        TotalColumn(
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.TrendingUp,
-                                    contentDescription = "Income",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (!isSystemInDarkTheme()) income_light else income_dark
-                                )
-                            },
-                            label = "Income",
-                            amount = CurrencyFormatter.formatCurrency(income, currency),
-                            color = if (!isSystemInDarkTheme()) income_light else income_dark,
-                            modifier = Modifier.alpha(incomeAlpha)
-                        )
-                    }
-
-                    // Vertical Divider
-                    VerticalDivider(
-                        modifier = Modifier
-                            .height(48.dp)
-                            .padding(horizontal = 0.5.dp),
-                        color = Color.Transparent
+                        },
+                        label = "Income",
+                        amount = CurrencyFormatter.formatCurrency(income, currency),
+                        color = if (!isSystemInDarkTheme()) income_light else income_dark,
+                        modifier = Modifier.alpha(incomeAlpha)
                     )
+                }
 
-                    // Expenses Column
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                shape = RoundedCornerShape(
-                                    topEnd = Spacing.xs,
-                                    topStart = Spacing.xs,
-                                    bottomEnd = Spacing.xs,
-                                    bottomStart = Spacing.xs
-                                )
-                            )
-                            .padding(Spacing.sm),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        TotalColumn(
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.TrendingDown,
-                                    contentDescription = "Expenses",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (!isSystemInDarkTheme()) expense_light else expense_dark
-                                )
-                            },
-                            label = "Expenses",
-                            amount = CurrencyFormatter.formatCurrency(expenses, currency),
-                            color = if (!isSystemInDarkTheme()) expense_light else expense_dark,
-                            modifier = Modifier.alpha(expenseAlpha)
+                // Expenses row
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(Spacing.xs)
                         )
-                    }
-
-                    // Vertical Divider
-                    VerticalDivider(
-                        modifier = Modifier
-                            .height(48.dp)
-                            .padding(horizontal = 0.5.dp),
-                        color = Color.Transparent
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                ) {
+                    TotalRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.TrendingDown,
+                                contentDescription = "Expenses",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (!isSystemInDarkTheme()) expense_light else expense_dark
+                            )
+                        },
+                        label = "Expenses",
+                        amount = CurrencyFormatter.formatCurrency(expenses, currency),
+                        color = if (!isSystemInDarkTheme()) expense_light else expense_dark,
+                        modifier = Modifier.alpha(expenseAlpha)
                     )
+                }
 
-                    // Net Balance Column
-                    val netColor = when {
-                        netBalance > BigDecimal.ZERO -> if (!isSystemInDarkTheme()) income_light else income_dark
-                        netBalance < BigDecimal.ZERO -> if (!isSystemInDarkTheme()) expense_light else expense_dark
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                // Net Balance row
+                val netColor = when {
+                    netBalance > BigDecimal.ZERO -> if (!isSystemInDarkTheme()) income_light else income_dark
+                    netBalance < BigDecimal.ZERO -> if (!isSystemInDarkTheme()) expense_light else expense_dark
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
 
-                    val netPrefix = when {
-                        netBalance > BigDecimal.ZERO -> "+"
-                        else -> ""
-                    }
+                val netPrefix = when {
+                    netBalance > BigDecimal.ZERO -> "+"
+                    else -> ""
+                }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                shape = RoundedCornerShape(
-                                    topEnd = Spacing.md,
-                                    topStart = Spacing.xs,
-                                    bottomEnd = Spacing.md,
-                                    bottomStart = Spacing.xs
-                                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(
+                                topStart = Spacing.xs,
+                                topEnd = Spacing.xs,
+                                bottomStart = Spacing.md,
+                                bottomEnd = Spacing.md
                             )
-                            .padding(Spacing.sm),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        TotalColumn(
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Filled.SettingsEthernet,
-                                    contentDescription = "Net",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = netColor
-                                )
-                            },
-                            label = "Net",
-                            amount = "$netPrefix${CurrencyFormatter.formatCurrency(netBalance, currency)}",
-                            color = netColor,
-                            modifier = Modifier.alpha(netAlpha)
                         )
-                    }
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                ) {
+                    TotalRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.SettingsEthernet,
+                                contentDescription = "Net",
+                                modifier = Modifier.size(20.dp),
+                                tint = netColor
+                            )
+                        },
+                        label = "Net",
+                        amount = "$netPrefix${CurrencyFormatter.formatCurrency(netBalance, currency)}",
+                        color = netColor,
+                        modifier = Modifier.alpha(netAlpha)
+                    )
                 }
             }
         }
@@ -229,17 +194,17 @@ fun TransactionTotalsCard(
 }
 
 @Composable
-private fun TotalColumn(
+private fun TotalRow(
     icon: @Composable (() -> Unit)?,
     label: String,
     amount: String,
     color: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -257,10 +222,12 @@ private fun TotalColumn(
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = color,
-            textAlign = TextAlign.Center,
+            textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .basicMarquee(iterations = Int.MAX_VALUE)
         )
     }
 }

@@ -113,6 +113,7 @@ fun SettingsScreen(
     val accounts by settingsViewModel.accounts.collectAsStateWithLifecycle()
     val mainAccountKey by settingsViewModel.mainAccountKey.collectAsStateWithLifecycle()
     val useContactsForVpa by settingsViewModel.useContactsForVpa.collectAsStateWithLifecycle(initialValue = false)
+    val useJalaliCalendar by settingsViewModel.useJalaliCalendar.collectAsStateWithLifecycle(initialValue = false)
     val isProEntitled by settingsViewModel.isProEntitled.collectAsStateWithLifecycle()
     var showUpgradeSheet by remember { mutableStateOf(false) }
     // Launches the runtime permission request. If granted, we flip the
@@ -223,6 +224,21 @@ fun SettingsScreen(
                     title = "Appearance",
                     subtitle = "Theme, colors, fonts & navigation",
                     onClick = onNavigateToAppearance,
+                    position = ItemPosition.SINGLE
+                )
+            }
+
+            // ── Calendar ──
+            SectionHeaderV2(title = "Calendar")
+            SettingsGroup {
+                SettingsSwitchRow(
+                    icon = Icons.Default.CalendarMonth,
+                    iconBgColor = orange_light,
+                    iconTint = orange_dark,
+                    title = "Persian Calendar",
+                    subtitle = "Show dates using the Jalali (Persian) calendar",
+                    checked = useJalaliCalendar,
+                    onCheckedChange = { settingsViewModel.setUseJalaliCalendar(it) },
                     position = ItemPosition.SINGLE
                 )
             }

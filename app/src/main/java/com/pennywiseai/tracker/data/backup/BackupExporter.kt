@@ -72,6 +72,7 @@ class BackupExporter @Inject constructor(
         val profiles = database.profileDao().getAllProfiles()
         val budgetMonthSnapshots = database.budgetSnapshotDao().getAllGroupSnapshots()
         val budgetCategoryMonthSnapshots = database.budgetSnapshotDao().getAllCategorySnapshots()
+        val transactionTypeRules = database.transactionTypeRuleDao().getAllOnce()
         
         // Get preferences from repository
         val prefs = userPreferencesRepository.userPreferences.first()
@@ -172,7 +173,10 @@ class BackupExporter @Inject constructor(
                 transactionGroups = exportedTransactionGroups,
                 profiles = exportedProfiles,
                 budgetMonthSnapshots = exportedBudgetMonthSnapshots,
-                budgetCategoryMonthSnapshots = exportedBudgetCategoryMonthSnapshots
+                budgetCategoryMonthSnapshots = exportedBudgetCategoryMonthSnapshots,
+                // No PII (just bank name + a label string + Income/Expense), so
+                // included in every privacy mode, like rules.
+                transactionTypeRules = transactionTypeRules
             ),
             preferences = PreferencesSnapshot(
                 theme = ThemePreferences(

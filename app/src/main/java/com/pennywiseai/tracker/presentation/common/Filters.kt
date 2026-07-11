@@ -3,10 +3,14 @@ package com.pennywiseai.tracker.presentation.common
 import com.pennywiseai.tracker.data.database.entity.AccountBalanceEntity
 import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.TemporalAdjusters
 
 enum class TimePeriod(val label: String) {
+    TODAY("Today"),
+    THIS_WEEK("This Week"),
     THIS_MONTH("This Month"),
     LAST_MONTH("Last Month"),
     CURRENT_FY("Current FY"),
@@ -26,6 +30,11 @@ enum class TransactionTypeFilter(val label: String) {
 fun getDateRangeForPeriod(period: TimePeriod): Pair<LocalDate, LocalDate>? {
     val today = LocalDate.now()
     return when (period) {
+        TimePeriod.TODAY -> today to today
+        TimePeriod.THIS_WEEK -> {
+            val start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            start to today
+        }
         TimePeriod.THIS_MONTH -> {
             val start = YearMonth.now().atDay(1)
             start to today

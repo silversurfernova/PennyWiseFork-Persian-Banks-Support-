@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
 import com.pennywiseai.tracker.ui.components.cards.PennyWiseCardV2
+import com.pennywiseai.tracker.ui.icons.CategoryIconSet
 import com.pennywiseai.tracker.ui.theme.Dimensions
 import com.pennywiseai.tracker.ui.theme.Spacing
 
@@ -43,14 +44,16 @@ private val presetColors = listOf(
 @Composable
 fun CategoryEditDialog(
     category: CategoryEntity? = null,
+    defaultIsIncome: Boolean = false,
     onDismiss: () -> Unit,
-    onSave: (name: String, color: String, isIncome: Boolean) -> Unit,
+    onSave: (name: String, color: String, icon: String, isIncome: Boolean) -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
     var name by remember { mutableStateOf(category?.name ?: "") }
-    var isIncome by remember { mutableStateOf(category?.isIncome ?: false) }
+    var isIncome by remember { mutableStateOf(category?.isIncome ?: defaultIsIncome) }
     var nameError by remember { mutableStateOf<String?>(null) }
     var selectedColor by remember { mutableStateOf(category?.color ?: "#4CAF50") }
+    var selectedIcon by remember { mutableStateOf(category?.icon?.ifBlank { null } ?: CategoryIconSet.icons.keys.first()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -125,6 +128,52 @@ fun CategoryEditDialog(
                     }
                 }
 
+                // Icon Selection
+                Column {
+                    Text(
+                        text = "Icon",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+
+                    val previewColor = try {
+                        Color(android.graphics.Color.parseColor(selectedColor))
+                    } catch (e: Exception) {
+                        MaterialTheme.colorScheme.primary
+                    }
+                    val iconTint = if (isLightColor(previewColor)) Color.Black.copy(alpha = 0.87f) else Color.White
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
+                        CategoryIconSet.icons.forEach { (key, icon) ->
+                            val isSelected = selectedIcon == key
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(previewColor)
+                                    .then(
+                                        if (isSelected) {
+                                            Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                        } else Modifier
+                                    )
+                                    .clickable { selectedIcon = key },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    icon,
+                                    contentDescription = key,
+                                    tint = iconTint,
+                                    modifier = Modifier.size(Dimensions.Icon.small)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Color Selection
                 Column {
                     Text(
@@ -189,16 +238,26 @@ fun CategoryEditDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                     ) {
-                        // Show selected color
+                        // Show selected icon + color
+                        val previewColor = try {
+                            Color(android.graphics.Color.parseColor(selectedColor))
+                        } catch (e: Exception) {
+                            MaterialTheme.colorScheme.primary
+                        }
                         Box(
                             modifier = Modifier
-                                .size(Dimensions.Icon.medium)
+                                .size(40.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    try { Color(android.graphics.Color.parseColor(selectedColor)) }
-                                    catch (e: Exception) { MaterialTheme.colorScheme.primary }
-                                )
-                        )
+                                .background(previewColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                CategoryIconSet.icons[selectedIcon] ?: CategoryIconSet.fallback,
+                                contentDescription = null,
+                                tint = if (isLightColor(previewColor)) Color.Black.copy(alpha = 0.87f) else Color.White,
+                                modifier = Modifier.size(Dimensions.Icon.small)
+                            )
+                        }
                         Text(
                             text = name.ifBlank { "Category Name" },
                             style = MaterialTheme.typography.bodyLarge
@@ -220,7 +279,7 @@ fun CategoryEditDialog(
                     Button(
                         onClick = {
                             if (name.isNotBlank()) {
-                                onSave(name.trim(), selectedColor, isIncome)
+                                onSave(name.trim(), selectedColor, selectedIcon, isIncome)
                             } else {
                                 nameError = "Category name is required"
                             }

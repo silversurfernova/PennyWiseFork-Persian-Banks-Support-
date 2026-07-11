@@ -28,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.pennywiseai.tracker.presentation.add.ReceiptPickerSection
+import com.pennywiseai.tracker.presentation.categories.CategoryEditDialog
 import com.pennywiseai.tracker.ui.effects.overScrollVertical
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -76,6 +77,7 @@ import com.pennywiseai.tracker.ui.components.SplitEditor
 import com.pennywiseai.tracker.ui.components.SplitItem
 import com.pennywiseai.tracker.ui.theme.*
 import com.pennywiseai.tracker.utils.CurrencyFormatter
+import com.pennywiseai.tracker.utils.DateFormatter
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.pennywiseai.tracker.utils.formatAmount
@@ -797,9 +799,7 @@ private fun TransactionReceipt(
             DetailInfoRow(
                 icon = Icons.Default.CalendarToday,
                 label = "Date & Time",
-                value = transaction.dateTime.format(
-                    DateTimeFormatter.ofPattern("EEE, MMM d, yyyy \u00b7 h:mm a")
-                )
+                value = DateFormatter.formatDayMonthYearTime(transaction.dateTime)
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -1179,24 +1179,53 @@ private fun EditableTransactionHeader(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(1.5.dp)
         ) {
-            TextField(
-                value = transaction.merchantName,
-                onValueChange = { viewModel.updateMerchantName(it) },
-                label = { Text("Merchant", fontWeight = FontWeight.SemiBold) },
-                leadingIcon = {
-                    BrandIcon(
-                        merchantName = transaction.merchantName,
-                        category = transaction.category,
-                        size = 24.dp,
-                        showBackground = false
-                    )
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = editTopShape,
-                isError = transaction.merchantName.isBlank(),
-                colors = editFilledColors()
-            )
+            var merchantMenuExpanded by remember { mutableStateOf(false) }
+            val merchantSuggestions by viewModel.merchantSuggestions.collectAsStateWithLifecycle()
+
+            ExposedDropdownMenuBox(
+                expanded = merchantMenuExpanded && merchantSuggestions.isNotEmpty(),
+                onExpandedChange = { merchantMenuExpanded = it }
+            ) {
+                TextField(
+                    value = transaction.merchantName,
+                    onValueChange = {
+                        viewModel.updateMerchantName(it)
+                        merchantMenuExpanded = true
+                    },
+                    label = { Text("Merchant", fontWeight = FontWeight.SemiBold) },
+                    leadingIcon = {
+                        BrandIcon(
+                            merchantName = transaction.merchantName,
+                            category = transaction.category,
+                            size = 24.dp,
+                            showBackground = false
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryEditable),
+                    shape = editTopShape,
+                    isError = transaction.merchantName.isBlank(),
+                    colors = editFilledColors()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = merchantMenuExpanded && merchantSuggestions.isNotEmpty(),
+                    onDismissRequest = { merchantMenuExpanded = false }
+                ) {
+                    merchantSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion) },
+                            onClick = {
+                                viewModel.updateMerchantName(suggestion)
+                                merchantMenuExpanded = false
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                        )
+                    }
+                }
+            }
 
             TextField(
                 value = transaction.description ?: "",
@@ -1313,6 +1342,7 @@ private fun EditableExtractedInfoCard(
                 CategoryDropdown(
                     selectedCategory = transaction.category,
                     onCategorySelected = { viewModel.updateCategory(it) },
+                    isIncome = transaction.transactionType == TransactionType.INCOME,
                     viewModel = viewModel
                 )
             }
@@ -1560,14 +1590,27 @@ private fun BudgetImpactSection(viewModel: TransactionDetailViewModel) {
 private fun CategoryDropdown(
     selectedCategory: String,
     onCategorySelected: (String) -> Unit,
+    isIncome: Boolean,
     viewModel: TransactionDetailViewModel
 ) {
     val categories by viewModel.categories.collectAsStateWithLifecycle(initialValue = emptyList())
     var expanded by remember { mutableStateOf(false) }
-    
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+
     // Find the selected category entity for displaying with color
     val selectedCategoryEntity = categories.find { it.name == selectedCategory }
-    
+
+    if (showAddCategoryDialog) {
+        CategoryEditDialog(
+            defaultIsIncome = isIncome,
+            onDismiss = { showAddCategoryDialog = false },
+            onSave = { name, color, icon, categoryIsIncome ->
+                viewModel.createCategory(name, color, icon, categoryIsIncome)
+                showAddCategoryDialog = false
+            }
+        )
+    }
+
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it }
@@ -1606,7 +1649,7 @@ private fun CategoryDropdown(
         ) {
             categories.forEach { category ->
                 DropdownMenuItem(
-                    text = { 
+                    text = {
                         CategoryChip(category = category)
                     },
                     onClick = {
@@ -1616,6 +1659,24 @@ private fun CategoryDropdown(
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }
+
+            HorizontalDivider()
+
+            DropdownMenuItem(
+                text = { Text("Add new category") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimensions.Icon.small)
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    showAddCategoryDialog = true
+                },
+                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+            )
         }
     }
 }

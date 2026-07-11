@@ -158,7 +158,7 @@ fun AnalyticsSummaryCard(
 
                 // Top Category Pill
                 if (topCategory != null && topCategoryPercentage > 0) {
-                    val categoryInfo = CategoryMapping.categories[topCategory]
+                    val categoryInfo = CategoryMapping.getCategoryInfoOrNull(topCategory)
                         ?: CategoryMapping.categories["Others"]!!
 
                     Column(horizontalAlignment = Alignment.End) {

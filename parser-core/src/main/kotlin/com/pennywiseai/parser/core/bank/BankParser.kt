@@ -43,15 +43,46 @@ abstract class BankParser {
             return null
         }
 
-        val type = extractTransactionType(smsBody)
-        if (type == null) {
-            return null
-        }
+        val type = extractTransactionType(smsBody) ?: return null
 
+        return buildParsedTransaction(smsBody, sender, timestamp, amount, type)
+    }
+
+    /**
+     * Builds the transaction using [resolvedType] directly, bypassing
+     * [extractTransactionType] entirely. For messages where [isPendingClassification]
+     * is true — [parse] gave up solely because the type couldn't be resolved —
+     * a caller that has since resolved [extractRawTypeLabel] to a type (via a
+     * user-taught rule, or manual classification) uses this to materialize the
+     * transaction without re-deriving amount/merchant/balance/etc.
+     *
+     * Not open: this is a recovery path for the base extraction pipeline, not
+     * a customization point. A parser with bespoke [parse] logic isn't a
+     * target for this mechanism (none currently are — only banks that expose
+     * [extractRawTypeLabel] can produce a pending classification in the first
+     * place, and none of those override [parse]).
+     */
+    fun parseWithResolvedType(
+        smsBody: String,
+        sender: String,
+        timestamp: Long,
+        resolvedType: TransactionType
+    ): ParsedTransaction? {
+        if (!isTransactionMessage(smsBody)) return null
+        val amount = extractAmount(smsBody) ?: return null
+        return buildParsedTransaction(smsBody, sender, timestamp, amount, resolvedType)
+    }
+
+    private fun buildParsedTransaction(
+        smsBody: String,
+        sender: String,
+        timestamp: Long,
+        amount: BigDecimal,
+        type: TransactionType
+    ): ParsedTransaction {
         // Extract available limit for credit card transactions
         val availableLimit = if (type == TransactionType.CREDIT) {
-            val limit = extractAvailableLimit(smsBody)
-            limit
+            extractAvailableLimit(smsBody)
         } else {
             null
         }
@@ -204,6 +235,30 @@ abstract class BankParser {
 
             else -> null
         }
+    }
+
+    /**
+     * Names this message's transaction-type field verbatim (e.g. Tejarat's
+     * "نوع تراکنش:" value) when [extractTransactionType] doesn't recognize it,
+     * so a caller-supplied `typeOverride` in [parse] has something to match a
+     * user-taught rule against. Returns null for parsers that don't expose a
+     * distinct type field (the default) — most banks state direction via
+     * verbs scattered through the message rather than one clean field.
+     */
+    open fun extractRawTypeLabel(message: String): String? = null
+
+    /**
+     * True when this message has everything [parse] needs except a resolvable
+     * transaction type, and that type is nameable via [extractRawTypeLabel] —
+     * i.e. [parse] would only succeed given a matching `typeOverride`. Callers
+     * use this to offer the message up for manual classification instead of
+     * silently discarding it.
+     */
+    open fun isPendingClassification(message: String): Boolean {
+        if (!isTransactionMessage(message)) return false
+        if (extractAmount(message) == null) return false
+        if (extractTransactionType(message) != null) return false
+        return extractRawTypeLabel(message) != null
     }
 
     /**

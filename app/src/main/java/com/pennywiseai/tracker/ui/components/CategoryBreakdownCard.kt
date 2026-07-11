@@ -79,7 +79,7 @@ private fun CategoryBar(
     )
 
     // Get category-specific color
-    val categoryInfo = CategoryMapping.categories[category.name]
+    val categoryInfo = CategoryMapping.getCategoryInfoOrNull(category.name)
         ?: CategoryMapping.categories["Others"]!!
     val categoryColor = categoryInfo.color
 

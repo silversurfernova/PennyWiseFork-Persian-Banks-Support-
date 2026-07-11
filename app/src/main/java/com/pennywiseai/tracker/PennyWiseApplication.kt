@@ -7,7 +7,10 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.pennywiseai.tracker.data.preferences.UserPreferencesRepository
 import com.pennywiseai.tracker.data.repository.AppLockRepository
+import com.pennywiseai.tracker.data.repository.CategoryRepository
+import com.pennywiseai.tracker.ui.icons.CategoryMapping
 import com.pennywiseai.tracker.utils.CurrencyFormatter
+import com.pennywiseai.tracker.utils.DateFormatter
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +33,9 @@ class PennyWiseApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
+
+    @Inject
+    lateinit var categoryRepository: CategoryRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var activityReferences = 0
@@ -71,6 +77,24 @@ class PennyWiseApplication : Application(), Configuration.Provider {
         applicationScope.launch {
             userPreferencesRepository.numberFormatStyle.collectLatest { style ->
                 CurrencyFormatter.numberFormatStyle = style
+            }
+        }
+
+        // Keep CategoryMapping's custom-category icon/color cache in sync with
+        // the DB, same reasoning as CurrencyFormatter above — CategoryMapping
+        // is a stateless object read from Composables across the app, not
+        // scoped to any single screen's ViewModel.
+        applicationScope.launch {
+            categoryRepository.getAllCategories().collectLatest { categories ->
+                CategoryMapping.updateCustomCategories(categories)
+            }
+        }
+
+        // Keep DateFormatter's calendar system in sync with the user's preference,
+        // same reasoning as CurrencyFormatter above.
+        applicationScope.launch {
+            userPreferencesRepository.useJalaliCalendar.collectLatest { enabled ->
+                DateFormatter.useJalaliCalendar = enabled
             }
         }
     }

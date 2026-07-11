@@ -18,6 +18,7 @@ import com.pennywiseai.tracker.data.database.entity.UnrecognizedSmsEntity
 import com.pennywiseai.tracker.data.manager.TransactionDeduplication
 import com.pennywiseai.tracker.data.mapper.toEntity
 import com.pennywiseai.tracker.data.mapper.toEntityType
+import com.pennywiseai.tracker.data.mapper.toParserCoreType
 import com.pennywiseai.tracker.core.TimeConstants
 import com.pennywiseai.tracker.data.preferences.UserPreferencesRepository
 import com.pennywiseai.tracker.data.repository.*
@@ -67,6 +68,7 @@ class OptimizedSmsReaderWorker @AssistedInject constructor(
     private val merchantMappingRepository: MerchantMappingRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val unrecognizedSmsRepository: UnrecognizedSmsRepository,
+    private val transactionTypeRuleRepository: com.pennywiseai.tracker.data.repository.TransactionTypeRuleRepository,
     private val ruleRepository: RuleRepository,
     private val ruleEngine: RuleEngine,
     private val generateIncomeAutopayUseCase: com.pennywiseai.tracker.domain.usecase.GenerateIncomeAutopayUseCase
@@ -142,6 +144,9 @@ class OptimizedSmsReaderWorker @AssistedInject constructor(
      */
     private var merchantMappingCache: Map<String, String> = emptyMap()
 
+    /** (bankName, rawTypeLabel) -> type, preloaded once at scan start like [merchantMappingCache]. */
+    private var typeRuleCache: Map<Pair<String, String>, com.pennywiseai.tracker.data.database.entity.TransactionType> = emptyMap()
+
     /**
      * Rules preloaded by transaction type at scan start.
      * Previously: getActiveRulesByType DB call per transaction.
@@ -176,6 +181,18 @@ class OptimizedSmsReaderWorker @AssistedInject constructor(
 
         /** Unknown -T/-S sender — save to unrecognized table for review. */
         data class StoreUnrecognized(override val sms: SmsMessage) : ParseResult()
+
+        /**
+         * Recognized bank, but its transaction-type field (e.g. Tejarat's
+         * "نوع تراکنش:") didn't match a known value or a user-taught rule.
+         * Saved with [bankName]/[rawTypeLabel] so the review screen can offer
+         * "classify as Income/Expense" instead of just delete.
+         */
+        data class PendingClassification(
+            override val sms: SmsMessage,
+            val bankName: String,
+            val rawTypeLabel: String
+        ) : ParseResult()
 
         /**
          * Subscription mandate or balance update.
@@ -329,10 +346,11 @@ class OptimizedSmsReaderWorker @AssistedInject constructor(
                 ruleCache = TransactionType.entries.associateWith { type ->
                     ruleRepository.getActiveRulesByType(type)
                 }
+                typeRuleCache = transactionTypeRuleRepository.loadCache()
             } finally {
                 Trace.endSection()
             }
-            Log.i(TAG, "Caches: ${merchantMappingCache.size} merchant mappings, ${ruleCache.values.map { it.size }.sum()} rules")
+            Log.i(TAG, "Caches: ${merchantMappingCache.size} merchant mappings, ${ruleCache.values.map { it.size }.sum()} rules, ${typeRuleCache.size} type rules")
 
             // Fast COUNT queries — avoids loading all messages before the pipeline
             val smsCount = countSmsMessages(scanStartTime)
@@ -451,6 +469,22 @@ class OptimizedSmsReaderWorker @AssistedInject constructor(
                             if (unrecognizedBatch.size >= UNRECOGNIZED_BATCH_SIZE)
                                 flushUnrecognizedBatch(unrecognizedBatch)
                         }
+                        is ParseResult.PendingClassification -> {
+                            try {
+                                unrecognizedSmsRepository.insert(
+                                    UnrecognizedSmsEntity(
+                                        sender = result.sms.sender,
+                                        smsBody = result.sms.body,
+                                        receivedAt = result.sms.timestamp.toLocalDateTime(),
+                                        bankName = result.bankName,
+                                        rawTypeLabel = result.rawTypeLabel
+                                    )
+                                )
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                Log.e(TAG, "Error storing pending classification: ${e.message}")
+                            }
+                        }
                         is ParseResult.SpecialNotification -> {
                             try { result.onSave() }
                             catch (e: Exception) { Log.e(TAG, "Error saving special notification: ${e.message}") }
@@ -531,10 +565,26 @@ class OptimizedSmsReaderWorker @AssistedInject constructor(
         checkSubscriptionOrBalance(parser, sms, isRecent)?.let { return it }
 
         // Shared senders (M-Pesa KE/TZ/MZ): first candidate whose content parses.
-        val parsed = parsers.firstNotNullOfOrNull { it.parse(sms.body, sms.sender, sms.timestamp) }
-            ?: return ParseResult.Discard(sms)
+        parsers.firstNotNullOfOrNull { it.parse(sms.body, sms.sender, sms.timestamp) }?.let {
+            return ParseResult.Transaction(sms, it)
+        }
 
-        return ParseResult.Transaction(sms, parsed)
+        // No parser resolved a type on its own — see if a user-taught rule
+        // covers it (keyed on the bank's own raw label, e.g. Tejarat's
+        // "نوع تراکنش:" value), or surface it for manual classification.
+        for (p in parsers) {
+            val rawLabel = p.extractRawTypeLabel(sms.body) ?: continue
+            val bankName = p.getBankName()
+            typeRuleCache[bankName to rawLabel]?.let { ruleType ->
+                p.parseWithResolvedType(sms.body, sms.sender, sms.timestamp, ruleType.toParserCoreType())
+                    ?.let { return ParseResult.Transaction(sms, it) }
+            }
+            if (p.isPendingClassification(sms.body)) {
+                return ParseResult.PendingClassification(sms, bankName, rawLabel)
+            }
+        }
+
+        return ParseResult.Discard(sms)
     }
 
     // ─── Subscription / balance detection (pure parse, zero DB access) ────────
