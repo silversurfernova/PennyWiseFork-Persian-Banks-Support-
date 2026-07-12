@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pennywiseai.tracker.ui.components.BalancePoint
 import com.pennywiseai.tracker.ui.components.buildHeatmapMonthLabels
+import com.pennywiseai.tracker.utils.DateFormatter
 import java.time.DayOfWeek
 import java.time.temporal.ChronoUnit
 
@@ -39,7 +40,7 @@ fun SpendingHeatmap(
 
     val totalWeeks = ChronoUnit.WEEKS.between(startDate, endDate.plusDays(1)).toInt() + 1
 
-    val monthLabels = remember(startDate, endDate) {
+    val monthLabels = remember(startDate, endDate, DateFormatter.useJalaliCalendar) {
         buildHeatmapMonthLabels(startDate, endDate)
     }
 

@@ -123,6 +123,26 @@ class TransactionDetailViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val allDescriptions: StateFlow<List<String>> = transactionRepository.getAllDescriptions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Past description text matching what's currently typed into the edit
+     * field, same suggestion rules as [merchantSuggestions] (no exact-match
+     * echo, empty until you've typed something).
+     */
+    val descriptionSuggestions: StateFlow<List<String>> = combine(
+        _editableTransaction, allDescriptions
+    ) { txn, descriptions ->
+        val query = txn?.description?.trim().orEmpty()
+        if (query.isEmpty()) {
+            emptyList()
+        } else {
+            descriptions.filter { it.contains(query, ignoreCase = true) && !it.equals(query, ignoreCase = true) }
+                .take(5)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val activeBudgetCategories: StateFlow<List<String>> = budgetGroupRepository.getActiveGroups()
         .map { groups ->
             groups.map { it.categories.map { cat -> cat.categoryName } }.flatten().distinct().sorted()

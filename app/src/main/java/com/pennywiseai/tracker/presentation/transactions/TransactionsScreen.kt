@@ -588,7 +588,6 @@ fun TransactionsScreen(
                                 if (selectionMode) {
                                     com.pennywiseai.tracker.ui.components.cards.TransactionItem(
                                         transaction = transaction,
-                                        showDate = dateGroup == DateGroup.EARLIER,
                                         listItemPosition = ListItemPosition.from(index, transactions.size),
                                         convertedAmount = convertedAmounts[transaction.id],
                                         displayCurrency = if (isUnifiedMode) selectedCurrency else null,
@@ -605,7 +604,6 @@ fun TransactionsScreen(
                                         ) {
                                             com.pennywiseai.tracker.ui.components.cards.TransactionItem(
                                                 transaction = transaction,
-                                                showDate = dateGroup == DateGroup.EARLIER,
                                                 listItemPosition = ListItemPosition.from(index, transactions.size),
                                                 convertedAmount = convertedAmounts[transaction.id],
                                                 displayCurrency = if (isUnifiedMode) selectedCurrency else null,

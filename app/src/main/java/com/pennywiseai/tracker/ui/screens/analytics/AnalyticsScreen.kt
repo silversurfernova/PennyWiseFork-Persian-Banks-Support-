@@ -569,30 +569,6 @@ private fun AnalyticsFilterBar(
             }
         }
 
-        if (profiles.isNotEmpty()) {
-            item {
-                val selectedProfileLabel = profiles.find { it.id == selectedProfileId }?.name
-                Box {
-                    ExpressiveFilterChip(
-                        colors = analyticsFilterChipColors(),
-                        border = analyticsFilterChipBorder(selected = selectedProfileId != null),
-                        selected = selectedProfileId != null,
-                        text = selectedProfileLabel ?: "All Accounts",
-                        icon = profileFilterIcon(profiles, selectedProfileId),
-                        onClick = onProfileClick
-                    )
-
-                    ProfileFilterDropdown(
-                        expanded = showProfileMenu,
-                        profiles = profiles,
-                        selectedProfileId = selectedProfileId,
-                        onProfileSelected = onProfileSelected,
-                        onDismiss = onProfileDismiss
-                    )
-                }
-            }
-        }
-
         item {
             Box {
                 ExpressiveFilterChip(
@@ -630,6 +606,60 @@ private fun AnalyticsFilterBar(
             }
         }
 
+        if (accountOptions.isNotEmpty()) {
+            item {
+                val selectedAccountLabel =
+                    accountOptions.firstOrNull { it.key == accountFilter }?.label
+                Box {
+                    ExpressiveFilterChip(
+                        colors = analyticsFilterChipColors(),
+                        border = analyticsFilterChipBorder(selected = accountFilter != null),
+                        selected = accountFilter != null,
+                        text = selectedAccountLabel ?: "Account",
+                        icon = Icons.Default.AccountBalanceWallet,
+                        onClick = onAccountClick
+                    )
+
+                    DropdownMenu(
+                        expanded = showAccountMenu,
+                        onDismissRequest = onAccountDismiss,
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("All accounts") },
+                            leadingIcon = {
+                                if (accountFilter == null) {
+                                    Icon(Icons.Default.Check, contentDescription = null)
+                                } else {
+                                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
+                                }
+                            },
+                            onClick = { onAccountSelected(null) }
+                        )
+                        accountOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        option.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                leadingIcon = {
+                                    if (accountFilter == option.key) {
+                                        Icon(Icons.Default.Check, contentDescription = null)
+                                    } else {
+                                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
+                                    }
+                                },
+                                onClick = { onAccountSelected(option.key) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Box {
                 ExpressiveFilterChip(
@@ -661,6 +691,30 @@ private fun AnalyticsFilterBar(
                             onClick = { onTypeSelected(typeFilter) }
                         )
                     }
+                }
+            }
+        }
+
+        if (profiles.isNotEmpty()) {
+            item {
+                val selectedProfileLabel = profiles.find { it.id == selectedProfileId }?.name
+                Box {
+                    ExpressiveFilterChip(
+                        colors = analyticsFilterChipColors(),
+                        border = analyticsFilterChipBorder(selected = selectedProfileId != null),
+                        selected = selectedProfileId != null,
+                        text = selectedProfileLabel ?: "All Accounts",
+                        icon = profileFilterIcon(profiles, selectedProfileId),
+                        onClick = onProfileClick
+                    )
+
+                    ProfileFilterDropdown(
+                        expanded = showProfileMenu,
+                        profiles = profiles,
+                        selectedProfileId = selectedProfileId,
+                        onProfileSelected = onProfileSelected,
+                        onDismiss = onProfileDismiss
+                    )
                 }
             }
         }
@@ -749,60 +803,6 @@ private fun AnalyticsFilterBar(
                                     }
                                 },
                                 onClick = { onCategorySelected(category) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (accountOptions.isNotEmpty()) {
-            item {
-                val selectedAccountLabel =
-                    accountOptions.firstOrNull { it.key == accountFilter }?.label
-                Box {
-                    ExpressiveFilterChip(
-                        colors = analyticsFilterChipColors(),
-                        border = analyticsFilterChipBorder(selected = accountFilter != null),
-                        selected = accountFilter != null,
-                        text = selectedAccountLabel ?: "Account",
-                        icon = Icons.Default.AccountBalanceWallet,
-                        onClick = onAccountClick
-                    )
-
-                    DropdownMenu(
-                        expanded = showAccountMenu,
-                        onDismissRequest = onAccountDismiss,
-                        shape = MaterialTheme.shapes.large
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("All accounts") },
-                            leadingIcon = {
-                                if (accountFilter == null) {
-                                    Icon(Icons.Default.Check, contentDescription = null)
-                                } else {
-                                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
-                                }
-                            },
-                            onClick = { onAccountSelected(null) }
-                        )
-                        accountOptions.forEach { option ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        option.label,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                leadingIcon = {
-                                    if (accountFilter == option.key) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    } else {
-                                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
-                                    }
-                                },
-                                onClick = { onAccountSelected(option.key) }
                             )
                         }
                     }

@@ -469,52 +469,12 @@ fun HomeScreen(
                 }
             }
 
-            // 2. Budget Carousel (50ms delay)
-            uiState.budgetSummary?.let { summary ->
-                item {
-                    val visible = remember { mutableStateOf(hasAnimated) }
-                    LaunchedEffect(Unit) {
-                        if (!hasAnimated) { delay(50); visible.value = true }
-                    }
-                    AnimatedVisibility(
-                        visible = visible.value,
-                        enter = fadeIn(tween(300)) + slideInVertically(
-                            initialOffsetY = { slideOffsetPx },
-                            animationSpec = tween(300)
-                        )
-                    ) {
-                        Column {
-                            SectionHeaderV2(
-                                title = "Budgets",
-                                modifier = Modifier.padding(horizontal = Dimensions.Padding.content),
-                                action = {
-                                    TextButton(onClick = onNavigateToBudgets) {
-                                        Text("View All")
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(Dimensions.Icon.small)
-                                        )
-                                    }
-                                }
-                            )
-                            BudgetCarousel(
-                                summary = summary,
-                                onClick = onNavigateToBudgets,
-                                onCreateBudget = onNavigateToBudgets,
-                                modifier = Modifier.padding(horizontal = Dimensions.Padding.content)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 2.5. Loans Summary (75ms delay) — only when active loans exist
+            // 2. Loans Summary (50ms delay) — only when active loans exist
             uiState.loanSummary?.let { summary ->
                 item {
                     val visible = remember { mutableStateOf(hasAnimated) }
                     LaunchedEffect(Unit) {
-                        if (!hasAnimated) { delay(75); visible.value = true }
+                        if (!hasAnimated) { delay(50); visible.value = true }
                     }
                     AnimatedVisibility(
                         visible = visible.value,
@@ -552,11 +512,11 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Recent Transactions Section (100ms delay)
+            // 3. Recent Transactions Section (75ms delay)
             item {
                 val visible = remember { mutableStateOf(hasAnimated) }
                 LaunchedEffect(Unit) {
-                    if (!hasAnimated) { delay(100); visible.value = true }
+                    if (!hasAnimated) { delay(75); visible.value = true }
                 }
                 AnimatedVisibility(
                     visible = visible.value,
@@ -616,7 +576,7 @@ fun HomeScreen(
                 item {
                     val visible = remember { mutableStateOf(hasAnimated) }
                     LaunchedEffect(Unit) {
-                        if (!hasAnimated) { delay(150); visible.value = true }
+                        if (!hasAnimated) { delay(100); visible.value = true }
                     }
                     AnimatedVisibility(
                         visible = visible.value,
@@ -648,7 +608,7 @@ fun HomeScreen(
                 item {
                     val visible = remember { mutableStateOf(hasAnimated) }
                     LaunchedEffect(Unit) {
-                        if (!hasAnimated) { delay(150); visible.value = true }
+                        if (!hasAnimated) { delay(100); visible.value = true }
                     }
                     AnimatedVisibility(
                         visible = visible.value,
@@ -688,12 +648,12 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Account Carousel (200ms delay)
+            // 4. Account Carousel (125ms delay)
             if (uiState.creditCards.isNotEmpty() || uiState.accountBalances.isNotEmpty()) {
                 item {
                     val visible = remember { mutableStateOf(hasAnimated) }
                     LaunchedEffect(Unit) {
-                        if (!hasAnimated) { delay(200); visible.value = true }
+                        if (!hasAnimated) { delay(125); visible.value = true }
                     }
                     AnimatedVisibility(
                         visible = visible.value,
@@ -739,12 +699,52 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Upcoming Subscriptions Alert (250ms delay)
+            // 5. Budget Carousel (150ms delay)
+            uiState.budgetSummary?.let { summary ->
+                item {
+                    val visible = remember { mutableStateOf(hasAnimated) }
+                    LaunchedEffect(Unit) {
+                        if (!hasAnimated) { delay(150); visible.value = true }
+                    }
+                    AnimatedVisibility(
+                        visible = visible.value,
+                        enter = fadeIn(tween(300)) + slideInVertically(
+                            initialOffsetY = { slideOffsetPx },
+                            animationSpec = tween(300)
+                        )
+                    ) {
+                        Column {
+                            SectionHeaderV2(
+                                title = "Budgets",
+                                modifier = Modifier.padding(horizontal = Dimensions.Padding.content),
+                                action = {
+                                    TextButton(onClick = onNavigateToBudgets) {
+                                        Text("View All")
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(Dimensions.Icon.small)
+                                        )
+                                    }
+                                }
+                            )
+                            BudgetCarousel(
+                                summary = summary,
+                                onClick = onNavigateToBudgets,
+                                onCreateBudget = onNavigateToBudgets,
+                                modifier = Modifier.padding(horizontal = Dimensions.Padding.content)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 6. Upcoming Subscriptions Alert (175ms delay)
             if (uiState.upcomingSubscriptions.isNotEmpty()) {
                 item {
                     val visible = remember { mutableStateOf(hasAnimated) }
                     LaunchedEffect(Unit) {
-                        if (!hasAnimated) { delay(250); visible.value = true }
+                        if (!hasAnimated) { delay(175); visible.value = true }
                     }
                     AnimatedVisibility(
                         visible = visible.value,
@@ -785,11 +785,11 @@ fun HomeScreen(
                 }
             }
 
-            // 6. Heatmap Widget (300ms delay)
+            // 7. Heatmap Widget (200ms delay)
             item {
                 val visible = remember { mutableStateOf(hasAnimated) }
                 LaunchedEffect(Unit) {
-                    if (!hasAnimated) { delay(300); visible.value = true }
+                    if (!hasAnimated) { delay(200); visible.value = true }
                 }
                 AnimatedVisibility(
                     visible = visible.value,

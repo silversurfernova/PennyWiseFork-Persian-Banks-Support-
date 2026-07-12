@@ -1,22 +1,22 @@
 package com.pennywiseai.tracker.ui.components
 
+import com.pennywiseai.tracker.utils.DateFormatter
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 fun buildHeatmapMonthLabels(
     startDate: LocalDate,
     endDate: LocalDate
 ): List<Pair<Int, String>> {
-    val formatter = DateTimeFormatter.ofPattern("MMM")
     val allMonthStarts = mutableListOf<Pair<Int, String>>()
     var current = startDate
     var lastMonth = -1
     var weekIndex = 0
 
     while (current <= endDate) {
-        if (current.monthValue != lastMonth) {
-            allMonthStarts.add(weekIndex to current.format(formatter))
-            lastMonth = current.monthValue
+        val month = DateFormatter.calendarMonthValue(current)
+        if (month != lastMonth) {
+            allMonthStarts.add(weekIndex to DateFormatter.formatMonth(current))
+            lastMonth = month
         }
         current = current.plusWeeks(1)
         weekIndex++

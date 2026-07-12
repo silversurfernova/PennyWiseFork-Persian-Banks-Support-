@@ -92,6 +92,13 @@ interface TransactionDao {
 
     @Query("SELECT DISTINCT merchant_name FROM transactions WHERE is_deleted = 0 ORDER BY merchant_name ASC")
     fun getAllMerchants(): Flow<List<String>>
+
+    @Query("""
+        SELECT DISTINCT description FROM transactions
+        WHERE is_deleted = 0 AND description IS NOT NULL AND description != ''
+        ORDER BY description ASC
+    """)
+    fun getAllDescriptions(): Flow<List<String>>
     
     @Query("""
         SELECT SUM(amount) FROM transactions 

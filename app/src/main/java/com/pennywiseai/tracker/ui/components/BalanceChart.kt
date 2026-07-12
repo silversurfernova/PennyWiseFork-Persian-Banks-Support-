@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pennywiseai.tracker.ui.theme.Spacing
 import com.pennywiseai.tracker.utils.CurrencyFormatter
+import com.pennywiseai.tracker.utils.DateFormatter
 import ir.ehsannarmani.compose_charts.LineChart
 import ir.ehsannarmani.compose_charts.models.AnimationMode
 import ir.ehsannarmani.compose_charts.models.DividerProperties
@@ -29,7 +30,6 @@ import ir.ehsannarmani.compose_charts.models.StrokeStyle
 import ir.ehsannarmani.compose_charts.models.ZeroLineProperties
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 data class BalancePoint(
@@ -61,22 +61,24 @@ fun BalanceChart(
         smoothedHistory.map { it.balance.toDouble() }
     }
 
-    val labels = remember(smoothedHistory) {
-        val isYearly = smoothedHistory.size > 1 && smoothedHistory.all { it.timestamp.dayOfYear == 1 }
-        val isMonthly = !isYearly && smoothedHistory.all { it.timestamp.dayOfMonth == 1 }
+    val labels = remember(smoothedHistory, DateFormatter.useJalaliCalendar) {
+        val isYearly = smoothedHistory.size > 1 && smoothedHistory.all { DateFormatter.isYearStart(it.timestamp.toLocalDate()) }
+        val isMonthly = !isYearly && smoothedHistory.all { DateFormatter.isMonthStart(it.timestamp.toLocalDate()) }
         val spansMultipleYears = if (smoothedHistory.isNotEmpty()) {
-            smoothedHistory.first().timestamp.year != smoothedHistory.last().timestamp.year
+            DateFormatter.calendarYear(smoothedHistory.first().timestamp.toLocalDate()) !=
+                DateFormatter.calendarYear(smoothedHistory.last().timestamp.toLocalDate())
         } else false
 
-        smoothedHistory.map {
-            val date = it.timestamp
+        val rawLabels = smoothedHistory.map {
+            val date = it.timestamp.toLocalDate()
             when {
-                isYearly -> date.format(DateTimeFormatter.ofPattern("yyyy"))
-                isMonthly && spansMultipleYears -> date.format(DateTimeFormatter.ofPattern("MMM yy"))
-                isMonthly -> date.format(DateTimeFormatter.ofPattern("MMM"))
-                else -> date.format(DateTimeFormatter.ofPattern("dd MMM"))
+                isYearly -> DateFormatter.formatYear(date)
+                isMonthly && spansMultipleYears -> DateFormatter.formatMonthYear(date)
+                isMonthly -> DateFormatter.formatMonth(date)
+                else -> DateFormatter.formatDayMonth(date)
             }
         }
+        thinLabels(rawLabels)
     }
 
     LineChart(
@@ -168,6 +170,26 @@ fun BalanceChart(
         ),
         animationMode = AnimationMode.Together(delayBuilder = { it * 200L }),
     )
+}
+
+/**
+ * Blanks all but every Nth label so at most [maxLabels] are non-empty,
+ * evenly spaced by index.
+ *
+ * With dense daily-granularity data (e.g. a full "This Month" trend, ~20-31
+ * points) labelling every single point at a -45° rotation left the compose_charts
+ * line renderer's own overlap handling to decide which labels to actually draw
+ * near each point — for a peak that lands between two crowded labels, the
+ * rendered tick can end up visually a few points off from the data it's meant
+ * to caption. Blanking the skipped labels ourselves guarantees that whichever
+ * label IS shown sits under its own real point, with no ambiguity for the
+ * chart library to resolve. Used by both [BalanceChart] and (via import)
+ * `SpendingBarChart`, so Line/Bar stay visually consistent.
+ */
+fun thinLabels(labels: List<String>, maxLabels: Int = 8): List<String> {
+    if (labels.size <= maxLabels) return labels
+    val step = kotlin.math.ceil(labels.size / maxLabels.toDouble()).toInt()
+    return labels.mapIndexed { index, label -> if (index % step == 0) label else "" }
 }
 
 /**

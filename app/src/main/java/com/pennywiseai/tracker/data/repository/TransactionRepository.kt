@@ -102,6 +102,9 @@ class TransactionRepository @Inject constructor(
 
     fun getAllMerchants(): Flow<List<String>> =
         transactionDao.getAllMerchants()
+
+    fun getAllDescriptions(): Flow<List<String>> =
+        transactionDao.getAllDescriptions()
     
     suspend fun getTotalAmountByTypeAndPeriod(
         type: TransactionType,

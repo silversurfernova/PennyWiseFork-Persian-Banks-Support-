@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pennywiseai.tracker.ui.components.buildHeatmapMonthLabels
 import com.pennywiseai.tracker.ui.theme.Dimensions
+import com.pennywiseai.tracker.utils.DateFormatter
 import com.pennywiseai.tracker.ui.theme.Spacing
 import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeEffectScope
@@ -47,7 +48,7 @@ fun HeatmapWidget(
     val today = LocalDate.now()
     val startDate = today.minusWeeks((weeksToShow - 1).toLong()).with(DayOfWeek.MONDAY)
 
-    val monthLabels = remember(startDate, today) {
+    val monthLabels = remember(startDate, today, DateFormatter.useJalaliCalendar) {
         buildHeatmapMonthLabels(startDate, today)
     }
 

@@ -84,7 +84,6 @@ import com.pennywiseai.tracker.utils.formatAmount
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 // Reusable filled field colors for edit mode
@@ -1227,21 +1226,50 @@ private fun EditableTransactionHeader(
                 }
             }
 
-            TextField(
-                value = transaction.description ?: "",
-                onValueChange = { viewModel.updateDescription(it) },
-                label = { Text("Description (Optional)", fontWeight = FontWeight.SemiBold) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Description,
-                        contentDescription = null,
-                        modifier = Modifier.size(Dimensions.Icon.medium)
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = editBottomShape,
-                colors = editFilledColors()
-            )
+            var descriptionMenuExpanded by remember { mutableStateOf(false) }
+            val descriptionSuggestions by viewModel.descriptionSuggestions.collectAsStateWithLifecycle()
+
+            ExposedDropdownMenuBox(
+                expanded = descriptionMenuExpanded && descriptionSuggestions.isNotEmpty(),
+                onExpandedChange = { descriptionMenuExpanded = it }
+            ) {
+                TextField(
+                    value = transaction.description ?: "",
+                    onValueChange = {
+                        viewModel.updateDescription(it)
+                        descriptionMenuExpanded = true
+                    },
+                    label = { Text("Description (Optional)", fontWeight = FontWeight.SemiBold) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(Dimensions.Icon.medium)
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryEditable),
+                    shape = editBottomShape,
+                    colors = editFilledColors()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = descriptionMenuExpanded && descriptionSuggestions.isNotEmpty(),
+                    onDismissRequest = { descriptionMenuExpanded = false }
+                ) {
+                    descriptionSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion) },
+                            onClick = {
+                                viewModel.updateDescription(suggestion)
+                                descriptionMenuExpanded = false
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                        )
+                    }
+                }
+            }
         }
 
         // Transaction Type
@@ -1723,13 +1751,13 @@ private fun DateTimeField(
                 Spacer(Modifier.size(Spacing.sm))
                 Column {
                     Text(
-                        text = dateTime.format(DateTimeFormatter.ofPattern("yyyy")),
+                        text = DateFormatter.formatYear(dateTime.toLocalDate()),
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        text = dateTime.format(DateTimeFormatter.ofPattern("dd MMMM")),
+                        text = DateFormatter.formatDayMonth(dateTime.toLocalDate()),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyLarge,

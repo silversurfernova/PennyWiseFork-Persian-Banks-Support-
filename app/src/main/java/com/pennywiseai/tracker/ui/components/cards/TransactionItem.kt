@@ -1,7 +1,12 @@
 package com.pennywiseai.tracker.ui.components.cards
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,9 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import android.view.HapticFeedbackConstants
+import androidx.compose.ui.unit.sp
 import com.pennywiseai.tracker.data.contacts.LocalMerchantDisplay
 import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
@@ -26,14 +32,12 @@ import com.pennywiseai.tracker.utils.CurrencyFormatter
 import com.pennywiseai.tracker.utils.DateFormatter
 import com.pennywiseai.tracker.utils.formatAmount
 import java.math.BigDecimal
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun TransactionItem(
     transaction: TransactionEntity,
     convertedAmount: BigDecimal? = null,
     displayCurrency: String? = null,
-    showDate: Boolean = true,
     showTypeLabel: Boolean = true,
     listItemPosition: ListItemPosition = ListItemPosition.Single,
     profileAccountKeys: Map<Long, Set<String>> = emptyMap(),
@@ -56,10 +60,12 @@ fun TransactionItem(
         }
     }
 
-    val timeOnlyFormatter = remember { DateTimeFormatter.ofPattern("h:mm a") }
-    val dateTimeText = remember(transaction.dateTime, showDate, DateFormatter.useJalaliCalendar) {
-        if (showDate) DateFormatter.formatDayMonthTime(transaction.dateTime)
-        else transaction.dateTime.format(timeOnlyFormatter)
+    // Bottom-right of the card always shows date + time together (e.g.
+    // "12 Jul · 8:00 PM") — always, regardless of which date-group section
+    // it's in, so a card is legible on its own without scrolling up to a
+    // sticky header for context.
+    val dateTimeText = remember(transaction.dateTime, DateFormatter.useJalaliCalendar) {
+        DateFormatter.formatDayMonthTime(transaction.dateTime)
     }
 
     val isEffectivelyBusiness = remember(transaction, profileAccountKeys) {
@@ -72,31 +78,36 @@ fun TransactionItem(
         effectiveProfileId == ProfileEntity.BUSINESS_ID
     }
 
-    // User-written description, if present, is surfaced as the LEAD segment of
-    // the subtitle (kept short) — not as the title. Promoting it to title made
-    // casual notes ("movie night with sarah") read as inconsistent next to
-    // brand-name merchants ("Uber", "Netflix") and routinely got truncated. The
-    // merchant stays the visual heading; the description is a small contextual
-    // tag below. (#383)
+    // User-written description, kept as its own row (truncated to one line)
+    // rather than folded into a joined subtitle string — a longer note
+    // shouldn't crowd out the category/time/bank info sitting next to it. (#383)
     val description = transaction.description?.takeIf { it.isNotBlank() }
 
-    val subtitle = remember(transaction, dateTimeText, isEffectivelyBusiness) {
-        buildList {
-            if (description != null) add(description)
-            add(dateTimeText)
-            if (transaction.category.isNotBlank() &&
-                !transaction.category.equals("Uncategorized", ignoreCase = true)
-            ) {
-                add(transaction.category)
-            }
+    val categoryLabel = transaction.category.takeIf {
+        it.isNotBlank() && !it.equals("Uncategorized", ignoreCase = true)
+    }
 
+    // "Bank ••1234" — which account/card the transaction posted against.
+    val bankLabel = remember(transaction.bankName, transaction.accountNumber) {
+        val bank = transaction.bankName?.takeIf { it.isNotBlank() }
+        val last4 = transaction.accountNumber?.takeIf { it.isNotBlank() }
+        when {
+            bank != null && last4 != null -> "$bank ••$last4"
+            bank != null -> bank
+            else -> null
+        }
+    }
+
+    // Secondary status badges — same set the old single-line subtitle carried,
+    // appended after category/date on the left rather than crowding the
+    // right-side amount/bank/time column.
+    val statusBadges = remember(transaction, showTypeLabel, isEffectivelyBusiness) {
+        buildList {
             if (showTypeLabel) {
                 when (transaction.transactionType) {
                     TransactionType.CREDIT -> add("Credit")
                     TransactionType.TRANSFER -> {
-                        if (transferTitleOverride(transaction) == null) {
-                            add("Transfer")
-                        }
+                        if (transferTitleOverride(transaction) == null) add("Transfer")
                     }
                     TransactionType.INVESTMENT -> add("Investment")
                     else -> {}
@@ -107,10 +118,11 @@ fun TransactionItem(
             // Mark rows the user excluded from analytics so it's visible in the
             // list which ones are skipped by spending stats (#451).
             if (transaction.excludedFromAnalytics) add("Excluded")
-            transaction.balanceAfter?.let { balance ->
-                add("Bal ${CurrencyFormatter.formatCurrency(balance, transaction.currency)}")
-            }
-        }.joinToString(" \u00B7 ")
+        }
+    }
+
+    val categoryLine = remember(categoryLabel, statusBadges) {
+        (listOfNotNull(categoryLabel) + statusBadges).joinToString(" · ")
     }
 
     val amountPrefix = remember(transaction.transactionType) {
@@ -136,71 +148,123 @@ fun TransactionItem(
     // the user's own contact name), and stops the two legs from looking like
     // duplicate rows in the list. Falls back to merchant otherwise.
     val transferTitle = transferTitleOverride(transaction)
+    val title = transferTitle ?: merchantDisplay(transaction.merchantName) ?: transaction.merchantName
 
-    ListItemCardV2(
-        title = transferTitle ?: merchantDisplay(transaction.merchantName) ?: transaction.merchantName,
-        subtitle = subtitle,
-        amount = "$amountPrefix$formattedAmount",
-        amountColor = amountColor,
+    PennyWiseCardV2(
+        modifier = modifier.fillMaxWidth(),
         shape = listItemPosition.toShape(),
         contentPadding = 14.dp,
+        containerColor = containerColor,
+        border = androidx.compose.foundation.BorderStroke(0.dp, androidx.compose.ui.graphics.Color.Transparent),
         onClick = {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             onClick()
         },
-        onLongClick = onLongClick,
-        containerColor = containerColor,
-        modifier = modifier,
-        leadingContent = {
-            val iconModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                with(sharedTransitionScope) {
-                    sharedElementIcon(
-                        key = "brand_icon_${transaction.id}",
-                        animatedVisibilityScope = animatedVisibilityScope
+        onLongClick = onLongClick
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            run {
+                val iconModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                    with(sharedTransitionScope) {
+                        sharedElementIcon(
+                            key = "brand_icon_${transaction.id}",
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+                BrandIcon(
+                    merchantName = transaction.merchantName,
+                    modifier = iconModifier,
+                    size = Dimensions.Icon.list,
+                    showBackground = true,
+                    category = transaction.category
+                )
+            }
+            Spacer(modifier = Modifier.width(Spacing.md))
+
+            // Left side: merchant, category (+ badges), and — the field allowed
+            // to truncate — the user's own description (up to 3 lines, since
+            // it's the one place worth spending the card's spare width/height on).
+            // Category/badges get no maxLines/ellipsis: short enough in practice
+            // that they should just wrap rather than silently lose information.
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = categoryLine,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (description != null) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            } else {
-                Modifier
             }
-            BrandIcon(
-                merchantName = transaction.merchantName,
-                modifier = iconModifier,
-                size = Dimensions.Icon.list,
-                showBackground = true,
-                category = transaction.category
-            )
-        },
-        trailingContent = {
-            if (convertedAmount != null && displayCurrency != null) {
-                Column(horizontalAlignment = Alignment.End) {
+
+            Spacer(modifier = Modifier.width(Spacing.sm))
+
+            // Right side: amount on top, bank/card in the middle, clock time at
+            // the bottom — a fixed vertical order so it always reads the same way.
+            Column(horizontalAlignment = Alignment.End) {
+                if (convertedAmount != null && displayCurrency != null) {
                     Text(
                         text = "$amountPrefix${CurrencyFormatter.formatCurrency(convertedAmount, displayCurrency)}",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = amountColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        textAlign = TextAlign.End
                     )
                     Text(
                         text = "(${transaction.formatAmount()})",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        textAlign = TextAlign.End
+                    )
+                } else {
+                    Text(
+                        text = "$amountPrefix$formattedAmount",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = amountColor,
+                        textAlign = TextAlign.End
                     )
                 }
-            } else {
+                if (bankLabel != null) {
+                    Text(
+                        text = bankLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        textAlign = TextAlign.End
+                    )
+                }
+                // Slightly smaller than labelSmall — this now carries date + time
+                // together ("12 Jul · 8:00 PM"), so it needs a touch more room to
+                // stay on one line without crowding the bank label above it.
                 Text(
-                    text = "$amountPrefix$formattedAmount",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = amountColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = dateTimeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    textAlign = TextAlign.End
                 )
             }
         }
-    )
+    }
 }
 
 /**

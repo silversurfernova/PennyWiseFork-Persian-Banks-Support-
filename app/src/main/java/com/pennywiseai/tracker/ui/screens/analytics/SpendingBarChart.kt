@@ -20,9 +20,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pennywiseai.tracker.ui.components.BalancePoint
+import com.pennywiseai.tracker.ui.components.thinLabels
 import com.pennywiseai.tracker.ui.theme.Spacing
 import com.pennywiseai.tracker.utils.CurrencyFormatter
-import java.time.format.DateTimeFormatter
+import com.pennywiseai.tracker.utils.DateFormatter
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -49,21 +50,26 @@ fun SpendingBarChart(
     val valueLabelStyle = TextStyle(fontSize = 10.sp, color = valueLabelColor, textAlign = TextAlign.Center)
     val indicatorStyle = TextStyle(fontSize = 10.sp, color = indicatorColor, textAlign = TextAlign.End)
 
-    val chartData = remember(sortedData) {
-        val isYearly = sortedData.size > 1 && sortedData.all { it.timestamp.dayOfYear == 1 }
-        val isMonthly = !isYearly && sortedData.all { it.timestamp.dayOfMonth == 1 }
+    val chartData = remember(sortedData, DateFormatter.useJalaliCalendar) {
+        val isYearly = sortedData.size > 1 && sortedData.all { DateFormatter.isYearStart(it.timestamp.toLocalDate()) }
+        val isMonthly = !isYearly && sortedData.all { DateFormatter.isMonthStart(it.timestamp.toLocalDate()) }
         val spansMultipleYears = if (sortedData.isNotEmpty()) {
-            sortedData.first().timestamp.year != sortedData.last().timestamp.year
+            DateFormatter.calendarYear(sortedData.first().timestamp.toLocalDate()) !=
+                DateFormatter.calendarYear(sortedData.last().timestamp.toLocalDate())
         } else false
 
-        sortedData.map { point ->
-            val label = when {
-                isYearly -> point.timestamp.format(DateTimeFormatter.ofPattern("yyyy"))
-                isMonthly && spansMultipleYears -> point.timestamp.format(DateTimeFormatter.ofPattern("MMM yy"))
-                isMonthly -> point.timestamp.format(DateTimeFormatter.ofPattern("MMM"))
-                else -> point.timestamp.format(DateTimeFormatter.ofPattern("dd MMM"))
+        val rawLabels = sortedData.map { point ->
+            val date = point.timestamp.toLocalDate()
+            when {
+                isYearly -> DateFormatter.formatYear(date)
+                isMonthly && spansMultipleYears -> DateFormatter.formatMonthYear(date)
+                isMonthly -> DateFormatter.formatMonth(date)
+                else -> DateFormatter.formatDayMonth(date)
             }
-            BarData(label = label, value = point.balance.toDouble())
+        }
+        val thinnedLabels = thinLabels(rawLabels)
+        sortedData.mapIndexed { index, point ->
+            BarData(label = thinnedLabels[index], value = point.balance.toDouble())
         }
     }
 
